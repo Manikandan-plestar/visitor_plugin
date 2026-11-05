@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#svt-network-dashboard-root,
+#svt-dashboard-root,
+#staff-root {
+  box-sizing: border-box;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+#svt-network-dashboard-root *,
+#svt-network-dashboard-root *::before,
+#svt-network-dashboard-root *::after,
+#svt-dashboard-root *,
+#svt-dashboard-root *::before,
+#svt-dashboard-root *::after,
+#staff-root *,
+#staff-root *::before,
+#staff-root *::after {
+  box-sizing: border-box;
+}
+
+/* Animations */
+@keyframes svt-pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
+.svt-pulsing-dot {
+  animation: svt-pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
