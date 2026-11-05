@@ -148,6 +148,58 @@ export default function StaffDashboard() {
     }
   };
 
+  // Instant Auto-Enrich Current Store via Backend WHOIS & Geo
+  const handleAutoEnrichCurrent = async () => {
+    if (!selectedStore?.activation_ip) return;
+    setLookupLoading(true);
+    try {
+      const res = await fetch(`/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(selectedStore.activation_ip)}`, {
+        headers: { 'x-staff-token': staffKey },
+      });
+      if (res.ok) {
+        const enriched = await res.json();
+        if (enriched && enriched.company_name) {
+          setFormData((prev) => ({
+            ...prev,
+            company_name: enriched.company_name,
+            physical_address: enriched.physical_address || prev.physical_address,
+            telephone: enriched.telephone || prev.telephone,
+            official_email: enriched.official_email || prev.official_email,
+            website: enriched.website || prev.website,
+            industry: enriched.industry || prev.industry,
+          }));
+          setLookupResult(enriched);
+        }
+      }
+    } catch (e) {
+      console.error('Auto-enrich current error:', e);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  // Batch Auto-Enrich All Pending Stores via WHOIS & Geolocation
+  const handleBatchAutoEnrich = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/v1/internal/admin/auto-enrich-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-staff-token': staffKey,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await fetchStaffData();
+      }
+    } catch (e) {
+      console.error('Batch auto-enrich error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const generateFallbackWhois = (ip) => {
     if (ip.startsWith('194.') || ip.startsWith('80.')) {
       return {
@@ -1021,9 +1073,21 @@ export default function StaffDashboard() {
                       <Clock className="w-4 h-4 text-amber-600" />
                       Pending Verification Queue
                     </h3>
-                    <span className="text-xs font-mono font-bold bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
-                      {pendingStores.length} Pending
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleBatchAutoEnrich}
+                        disabled={loading || pendingStores.length === 0}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-all shadow-sm flex items-center gap-1"
+                        title="Auto-enrich all pending stores via WHOIS & Geolocation"
+                      >
+                        <Bolt className="w-3 h-3" />
+                        <span>⚡ Auto-Enrich All</span>
+                      </button>
+                      <span className="text-xs font-mono font-bold bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
+                        {pendingStores.length} Pending
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-[11px] text-slate-500">
@@ -1090,14 +1154,26 @@ export default function StaffDashboard() {
 
                     <div className="flex items-center gap-2">
                       {selectedStore && (
-                        <button
-                          type="button"
-                          onClick={() => handleLookupIp(selectedStore.activation_ip)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] rounded-lg border border-slate-200 font-mono flex items-center gap-1"
-                        >
-                          <Search className="w-3 h-3" />
-                          <span>Lookup {selectedStore.activation_ip}</span>
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleAutoEnrichCurrent}
+                            disabled={lookupLoading}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1"
+                            title="Instant Auto-Enrich with WHOIS & Geolocation"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>{lookupLoading ? 'Resolving...' : '⚡ Auto-Enrich'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleLookupIp(selectedStore.activation_ip)}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] rounded-lg border border-slate-200 font-mono flex items-center gap-1"
+                          >
+                            <Search className="w-3 h-3" />
+                            <span>Lookup {selectedStore.activation_ip}</span>
+                          </button>
+                        </>
                       )}
                       <button
                         type="button"
