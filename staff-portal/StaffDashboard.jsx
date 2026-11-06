@@ -33,13 +33,18 @@ import {
   Radio,
   Cpu,
 } from 'lucide-react';
-import { mockStaffPortalData } from './staffMockData';
 
 export default function StaffDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'all-stores' | 'activations' | 'enrichment'
   const [staffKey, setStaffKey] = useState('svt_secret_staff_key_2026');
-  const [kpis, setKpis] = useState(mockStaffPortalData.kpis);
-  const [stores, setStores] = useState(mockStaffPortalData.stores);
+  const [kpis, setKpis] = useState({
+    total_stores: 0,
+    today_activated: 0,
+    pending_queue: 0,
+    verified_count: 0,
+    watching_count: 0,
+  });
+  const [stores, setStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,16 +69,25 @@ export default function StaffDashboard() {
     status: 'Verified',
   });
 
-  // Weekly activation trend data
-  const weeklyTrendData = [
-    { day: 'Oct 30', count: 4, height: '40%' },
-    { day: 'Oct 31', count: 7, height: '65%' },
-    { day: 'Nov 01', count: 9, height: '80%' },
-    { day: 'Nov 02', count: 3, height: '30%' },
-    { day: 'Nov 03', count: 5, height: '50%' },
-    { day: 'Nov 04', count: 11, height: '95%' },
-    { day: 'Nov 05 (Today)', count: 8, height: '75%' },
-  ];
+  // Weekly activation trend data computed dynamically from real store registrations
+  const weeklyTrendData = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const count = stores.filter(
+        (s) => s.created_at && String(s.created_at).startsWith(dateStr)
+      ).length;
+      const label = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' });
+      days.push({
+        day: label,
+        count,
+        height: count > 0 ? `${Math.min(100, Math.max(15, count * 25))}%` : '6%',
+      });
+    }
+    return days;
+  }, [stores]);
 
   // Fetch Data from Central Backend
   const fetchStaffData = async () => {

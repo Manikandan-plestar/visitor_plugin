@@ -34,7 +34,6 @@ import {
   Users,
   Info,
 } from 'lucide-react';
-import { mockWhoisvisitingCompanies } from './merchantMockData';
 
 export default function MerchantDashboard() {
   const wpSettings = window.svtSettings || {
@@ -45,12 +44,12 @@ export default function MerchantDashboard() {
     nonce: '',
   };
 
-  // State
-  const [useMockData, setUseMockData] = useState(true);
+  // State: Direct MySQL Database Live Data (Zero Dummy Data)
   const [liveCompanies, setLiveCompanies] = useState([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(mockWhoisvisitingCompanies[0]?.id || 1);
+  const [generalVisitors, setGeneralVisitors] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'GENERAL'
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [testPingStatus, setTestPingStatus] = useState(null);
 
@@ -63,7 +62,7 @@ export default function MerchantDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           target_store: wpSettings.storeUrl,
-          visitor_id: 'test_beacon_' + Date.now().toString(36),
+          visitor_id: 'live_test_' + Date.now().toString(36),
           page_url: '/product/industrial-turbine-sensor',
           referrer: 'https://www.google.com/search?q=test+live+visitor',
           screen_res: `${window.innerWidth}x${window.innerHeight}`,
@@ -71,8 +70,8 @@ export default function MerchantDashboard() {
       });
       if (res.ok) {
         setTestPingStatus('success');
-        setTimeout(() => setTestPingStatus(null), 3500);
-        if (!useMockData) fetchLiveAnalytics();
+        setTimeout(() => setTestPingStatus(null), 3000);
+        fetchLiveAnalytics();
       } else {
         setTestPingStatus('error');
       }
@@ -81,7 +80,7 @@ export default function MerchantDashboard() {
     }
   };
 
-  // Fetch Live Analytics Data from Central Express Node Backend
+  // Fetch Live Analytics Data from Central Express Node Backend (Connected to MySQL)
   const fetchLiveAnalytics = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -94,73 +93,74 @@ export default function MerchantDashboard() {
       const data = await res.json();
       if (data.companies && data.companies.length > 0) {
         setLiveCompanies(data.companies);
-        setSelectedCompanyId(data.companies[0].id);
+        setSelectedCompanyId((prev) => {
+          return data.companies.some((c) => c.id === prev) ? prev : data.companies[0].id;
+        });
       } else {
-        setErrorMsg('No live visits recorded yet. Switch to presentation mock mode to view Whoisvisiting interface.');
+        setLiveCompanies([]);
+      }
+      if (data.general_visitors) {
+        setGeneralVisitors(data.general_visitors);
       }
     } catch (err) {
-      setErrorMsg(`Could not connect to ${wpSettings.apiUrl}. Using high-fidelity Whoisvisiting mock data.`);
-      setUseMockData(true);
+      setErrorMsg(`Could not connect to database backend at ${wpSettings.apiUrl}. Ensure the backend service is running.`);
     } finally {
       setLoading(false);
     }
   };
 
+  // Initial fetch on component mount
   useEffect(() => {
-    if (!useMockData) {
-      fetchLiveAnalytics();
-    }
-  }, [useMockData]);
+    fetchLiveAnalytics();
+  }, []);
 
-  // Active Company List
+  // Active Company List directly from MySQL DB
   const companies = useMemo(() => {
-    if (!useMockData && liveCompanies.length > 0) {
-      return liveCompanies.map((c) => ({
-        id: c.id,
-        company_name: c.company_name || 'Unidentified Company',
-        initials: (c.company_name || 'UC')
-          .split(' ')
-          .map((n) => n[0])
-          .slice(0, 2)
-          .join('')
-          .toUpperCase(),
-        logo_bg: 'bg-blue-600',
-        status: c.status || 'company',
-        tags: [c.status === 'watching' ? 'Watching' : 'Company'],
-        physical_address: c.physical_address || 'Address pending enrichment',
-        telephone: c.telephone || '--',
-        official_email: c.official_email || '--',
-        website: c.website || '#',
-        linkedin_url: c.linkedin_url,
-        twitter_url: c.twitter_url,
-        industry: c.industry || 'B2B Enterprise',
-        acquisition_channel: c.acquisition_channel || 'Direct Navigation',
-        acquisition_badge: c.acquisition_channel?.includes('Google') ? 'Google' : 'Direct',
-        time_on_site: formatDuration(c.total_dwell_seconds || 120),
-        total_visits: c.total_visits || 1,
-        total_page_views: c.total_page_views || 1,
-        page_visits: (c.hits || []).map((h, i) => ({
-          id: 'hit_' + (h.id || i),
-          status: 'active',
-          date_time: formatHitTime(h.visited_at),
-          duration: formatDuration(h.duration_seconds || 60),
-          page_url: h.page_url || '/',
-          browser: h.browser || 'Chrome',
-          screen_res: h.screen_res || '1920x1080',
-          device_type: 'Desktop',
-          referrer: h.referrer || 'Direct Navigation',
-          is_single_page: !h.duration_seconds || h.duration_seconds < 40,
-        })),
-      }));
-    }
-    return mockWhoisvisitingCompanies.map((c) => ({
-      ...c,
-      is_partner_store:
-        c.is_partner_store !== undefined
-          ? c.is_partner_store
-          : c.company_name?.includes('Siemens') || c.company_name?.includes('Vodafone'),
+    return liveCompanies.map((c) => ({
+      id: c.id,
+      company_name: c.company_name || 'Unidentified Company',
+      initials: (c.company_name || 'UC')
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase(),
+      logo_bg: c.company_name?.includes('Siemens')
+        ? 'bg-emerald-600'
+        : c.company_name?.includes('Vodafone')
+        ? 'bg-red-600'
+        : c.company_name?.includes('Thomas')
+        ? 'bg-[#e85933]'
+        : 'bg-blue-600',
+      status: c.status || 'company',
+      is_partner_store: Boolean(c.is_partner_store),
+      tags: [c.status === 'watching' ? 'Watching' : 'Company'],
+      physical_address: c.physical_address || 'Address pending enrichment',
+      telephone: c.telephone || '--',
+      official_email: c.official_email || '--',
+      website: c.website || '#',
+      linkedin_url: c.linkedin_url,
+      twitter_url: c.twitter_url,
+      industry: c.industry || 'B2B Enterprise',
+      acquisition_channel: c.acquisition_channel || 'Direct Navigation',
+      acquisition_badge: c.acquisition_channel?.includes('Google') ? 'Google' : 'Direct',
+      time_on_site: formatDuration(c.total_dwell_seconds || 120),
+      total_visits: c.total_visits || 1,
+      total_page_views: c.total_page_views || 1,
+      page_visits: (c.hits || []).map((h, i) => ({
+        id: 'hit_' + (h.id || i),
+        status: 'active',
+        date_time: formatHitTime(h.visited_at),
+        duration: formatDuration(h.duration_seconds || 60),
+        page_url: h.page_url || '/',
+        browser: h.browser || 'Chrome',
+        screen_res: h.screen_res || '1920x1080',
+        device_type: 'Desktop',
+        referrer: h.referrer || 'Direct Navigation',
+        is_single_page: !h.duration_seconds || h.duration_seconds < 40,
+      })),
     }));
-  }, [useMockData, liveCompanies]);
+  }, [liveCompanies]);
 
   // Selected Company
   const selectedCompany = useMemo(() => {
@@ -187,38 +187,28 @@ export default function MerchantDashboard() {
           </p>
         </div>
 
-        {/* Mock / Live Mode Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setUseMockData(true)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                useMockData
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Whoisvisiting Demo Data
-            </button>
-            <button
-              type="button"
-              onClick={() => setUseMockData(false)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                !useMockData
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Live Telemetry
-            </button>
-          </div>
+        {/* Live MySQL Database Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>MySQL: wordpress_practice</span>
+          </span>
+
+          <button
+            type="button"
+            onClick={handleTestPing}
+            disabled={testPingStatus === 'sending'}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs flex items-center gap-1.5 transition-all"
+          >
+            <Radio className={`w-3.5 h-3.5 text-blue-500 ${testPingStatus === 'sending' ? 'animate-spin' : ''}`} />
+            <span>{testPingStatus === 'success' ? '✓ Hit Saved in DB' : 'Ping Live Hit'}</span>
+          </button>
 
           <button
             type="button"
             onClick={fetchLiveAnalytics}
-            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-600 shadow-sm transition-all"
-            title="Refresh feed"
+            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-600 shadow-2xs transition-all"
+            title="Refresh feed from MySQL"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -300,12 +290,12 @@ export default function MerchantDashboard() {
 
       {/* Main Row: Store Detail (Left) + Page Visits (Right) SIDE-BY-SIDE IN SAME ROW */}
       {activeFilter !== 'GENERAL' ? (
-        <div className="flex flex-row gap-6 items-start w-full overflow-x-auto pb-4">
-          {/* =================================================================== */}
-          {/* LEFT COLUMN: STORE / COMPANY DETAIL CARD                            */}
-          {/* =================================================================== */}
-          <div className="w-[380px] lg:w-[420px] shrink-0">
-            {selectedCompany && (
+        selectedCompany ? (
+          <div className="flex flex-row gap-6 items-start w-full overflow-x-auto pb-4">
+            {/* =================================================================== */}
+            {/* LEFT COLUMN: STORE / COMPANY DETAIL CARD                            */}
+            {/* =================================================================== */}
+            <div className="w-[380px] lg:w-[420px] shrink-0">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 {/* Header: Company Name & Action Tags */}
                 <div className="p-6 border-b border-slate-100">
@@ -443,8 +433,7 @@ export default function MerchantDashboard() {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
 
           {/* =================================================================== */}
           {/* RIGHT COLUMN: PAGE VISITS TABLE (SAME ROW)                          */}
@@ -562,6 +551,23 @@ export default function MerchantDashboard() {
           </div>
         </div>
       ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+          <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No Identified Companies in Database</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            When corporate visitors browse your store, their company records and page visits will appear here directly from MySQL.
+          </p>
+          <button
+            type="button"
+            onClick={handleTestPing}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1.5"
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>Simulate Incoming B2B Visitor Hit</span>
+          </button>
+        </div>
+      )
+    ) : (
         /* =================================================================== */
         /* GENERAL & RESIDENTIAL CONSUMER TRAFFIC VIEW                         */
         /* =================================================================== */
@@ -584,57 +590,44 @@ export default function MerchantDashboard() {
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Consumer Visits</span>
-                <span className="text-2xl font-black text-slate-900 font-mono">98</span>
+                <span className="text-2xl font-black text-slate-900 font-mono">{generalVisitors.length}</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="text-[10px] font-bold uppercase text-slate-400 block">Avg Session Time</span>
-                <span className="text-2xl font-black text-slate-900 font-mono">00:02:10</span>
+                <span className="text-2xl font-black text-slate-900 font-mono">
+                  {formatDuration(
+                    generalVisitors.length > 0
+                      ? Math.round(
+                          generalVisitors.reduce((acc, h) => acc + (h.duration_seconds || 60), 0) /
+                            generalVisitors.length
+                        )
+                      : 120
+                  )}
+                </span>
               </div>
             </div>
 
-            {/* Top Consumer Telecom Carriers */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                Top Consumer Carriers / ISPs
-              </span>
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="font-semibold text-slate-800">Comcast Cable Communications</span>
-                  <span className="font-mono text-slate-500 font-bold">42 hits</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="font-semibold text-slate-800">Vodafone UK Consumer Mobile</span>
-                  <span className="font-mono text-slate-500 font-bold">29 hits</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="font-semibold text-slate-800">Deutsche Telekom AG</span>
-                  <span className="font-mono text-slate-500 font-bold">18 hits</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="font-semibold text-slate-800">Jio Broadband Services</span>
-                  <span className="font-mono text-slate-500 font-bold">9 hits</span>
-                </div>
-              </div>
-            </div>
-
+            {/* General Traffic Note */}
             <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] space-y-1">
               <p className="font-bold flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-blue-600" />
-                Reverse-IP Note
+                Live MySQL Sessions
               </p>
-              <p>When visitors connect from residential internet connections, their company ASN is unassigned. Full dwell time, page sequence, and geographic location are captured.</p>
+              <p>
+                Showing real consumer sessions stored in MySQL table <code className="font-mono bg-blue-100 px-1 rounded">svt_visitor_hits</code> where company identity is unassigned.
+              </p>
             </div>
           </div>
 
-          {/* Right Column: General Visits Feed */}
+          {/* Right Column: General Visits Feed from MySQL */}
           <div className="flex-1 min-w-[540px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Consumer Session Telemetry</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Live stream of residential and general visitor navigation</p>
+                <p className="text-xs text-slate-400 mt-0.5">Live stream from MySQL database</p>
               </div>
               <span className="text-xs font-mono font-bold bg-amber-50 text-amber-800 px-3 py-1 rounded-full border border-amber-200">
-                98 Logged Sessions
+                {generalVisitors.length} Logged Sessions
               </span>
             </div>
 
@@ -642,7 +635,7 @@ export default function MerchantDashboard() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-200">
-                    <th className="py-3 px-4">Visitor Subnet / ISP</th>
+                    <th className="py-3 px-4">Visitor Subnet / IP</th>
                     <th className="py-3 px-4">Location</th>
                     <th className="py-3 px-4">Duration</th>
                     <th className="py-3 px-4">Page Visited</th>
@@ -650,35 +643,37 @@ export default function MerchantDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {[
-                    { ip: '82.165.44.xx', isp: 'Vodafone UK Mobile', loc: 'London, UK', dur: '00:03:15', page: '/product/industrial-turbine-sensor', dev: 'Chrome (Mobile)' },
-                    { ip: '73.189.12.xx', isp: 'Comcast Cable', loc: 'Denver, CO, US', dur: '00:01:45', page: '/our-plans', dev: 'Safari (Desktop)' },
-                    { ip: '217.80.99.xx', isp: 'Deutsche Telekom', loc: 'Frankfurt, DE', dur: '00:04:10', page: '/pricing', dev: 'Edge (Desktop)' },
-                    { ip: '157.48.21.xx', isp: 'Jio Broadband', loc: 'Mumbai, IN', dur: '00:02:05', page: '/', dev: 'Chrome (Mobile)' },
-                    { ip: '68.105.77.xx', isp: 'Cox Communications', loc: 'San Jose, CA, US', dur: '00:00:50', page: '/features', dev: 'Safari (Tablet)' },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-semibold text-slate-800">
-                        <div>{row.ip}</div>
-                        <div className="text-[10px] text-slate-400 font-sans">{row.isp}</div>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600">
-                        <span className="flex items-center gap-1 font-medium">
-                          <MapPin className="w-3 h-3 text-slate-400" />
-                          {row.loc}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
-                        {row.dur}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-blue-600 font-semibold">
-                        {row.page}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600">
-                        {row.dev}
+                  {generalVisitors.length > 0 ? (
+                    generalVisitors.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-semibold text-slate-800">
+                          <div>{row.visitor_ip}</div>
+                          <div className="text-[10px] text-slate-400 font-sans">Consumer ISP</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600">
+                          <span className="flex items-center gap-1 font-medium">
+                            <MapPin className="w-3 h-3 text-slate-400" />
+                            Regional / ISP Subnet
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
+                          {formatDuration(row.duration_seconds || 60)}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-blue-600 font-semibold max-w-[200px] truncate">
+                          {row.page_url}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600">
+                          {row.browser} ({row.screen_res || '1920x1080'})
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        No general consumer sessions recorded in MySQL yet.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

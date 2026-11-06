@@ -8,7 +8,7 @@ const cors = require('cors');
 const path = require('path');
 const dns = require('dns').promises;
 const http = require('http');
-const { Pool } = require('pg');
+const { initDb, getPool, getIsConnected } = require('./db');
 require('dotenv').config();
 
 const app = express();
@@ -57,6 +57,27 @@ const fetchIpApiData = (ip) => {
   });
 };
 
+// Helper: Save enriched IP to MySQL persistent cache table
+const saveToIpCache = async (data) => {
+  if (!data || !data.ip || !data.found || !getIsConnected()) return;
+  try {
+    await getPool().query(`
+      INSERT INTO svt_ip_cache (ip_address, company_name, physical_address, telephone, official_email, website, industry, source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), physical_address = VALUES(physical_address);
+    `, [
+      data.ip,
+      data.company_name,
+      data.physical_address || '',
+      data.telephone || '',
+      data.official_email || '',
+      data.website || '',
+      data.industry || 'B2B Enterprise',
+      data.source || 'Enrichment Engine',
+    ]);
+  } catch (e) {}
+};
+
 // Automatic Reverse-IP & Geolocation Enrichment Engine
 const autoEnrichIp = async (rawIp) => {
   const ip = (rawIp || '').trim();
@@ -65,6 +86,28 @@ const autoEnrichIp = async (rawIp) => {
   // 1. Check in-memory cache
   if (ipEnrichmentCache.has(ip)) {
     return ipEnrichmentCache.get(ip);
+  }
+
+  // 1b. Check MySQL persistent cache
+  if (getIsConnected()) {
+    try {
+      const [cached] = await getPool().query('SELECT * FROM svt_ip_cache WHERE ip_address = ?', [ip]);
+      if (cached.length > 0 && cached[0].company_name) {
+        const data = {
+          found: true,
+          source: cached[0].source || 'MySQL Persistent Cache',
+          ip,
+          company_name: cached[0].company_name,
+          physical_address: cached[0].physical_address || '',
+          telephone: cached[0].telephone || '',
+          official_email: cached[0].official_email || '',
+          website: cached[0].website || '',
+          industry: cached[0].industry || 'B2B Enterprise',
+        };
+        ipEnrichmentCache.set(ip, data);
+        return data;
+      }
+    } catch (e) {}
   }
 
   // 2. Check internal store registry
@@ -317,153 +360,13 @@ const requireStaffAuth = (req, res, next) => {
   next();
 };
 
-// Database connection
-let dbPool = null;
-let useDatabase = false;
+// Database initialization: Local XAMPP MySQL database (`wordpress_practice`)
+// Connects to MySQL on startup via mysql2, falling back to memoryDb if unavailable.
 
-if (process.env.DATABASE_URL) {
-  try {
-    dbPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    });
-    useDatabase = true;
-    console.log('🔗 PostgreSQL pool initialized.');
-  } catch (err) {
-    console.warn('⚠️ PostgreSQL unavailable. Falling back to in-memory store:', err.message);
-  }
-}
-
-// In-Memory Store
+// In-Memory Store (Clean empty fallback state when DB is disconnected)
 const memoryDb = {
-  stores: [
-    {
-      id: 1,
-      site_url: 'https://siemens-energy.com',
-      site_name: 'Siemens Energy Storefront',
-      activation_ip: '194.138.37.10',
-      status: 'Watching',
-      company_name: 'Siemens Energy AG',
-      physical_address: 'Otto-Hahn-Ring 6, 81739 Munich, Germany',
-      telephone: '+49 89 636 00',
-      official_email: 'contact@siemens-energy.com',
-      website: 'https://siemens-energy.com',
-      linkedin_url: 'https://linkedin.com/company/siemens-energy',
-      twitter_url: 'https://twitter.com/siemens_energy',
-      industry: 'Renewable Energy & Power Engineering',
-      acquisition_channel: 'Google Organic Search',
-      created_at: '2026-11-05T08:14:22Z',
-    },
-    {
-      id: 2,
-      site_url: 'https://vodafone-enterprise.com',
-      site_name: 'Vodafone Business Portal',
-      activation_ip: '212.183.128.50',
-      status: 'Verified',
-      company_name: 'Vodafone Group Plc',
-      physical_address: 'Vodafone House, The Connection, Newbury, Berkshire RG14 2FN, UK',
-      telephone: '+44 1635 33251',
-      official_email: 'enterprise-sales@vodafone.com',
-      website: 'https://vodafone.com',
-      linkedin_url: 'https://linkedin.com/company/vodafone',
-      twitter_url: 'https://twitter.com/vodafonegroup',
-      industry: 'Telecommunications & 5G Infrastructure',
-      acquisition_channel: 'LinkedIn Referral',
-      created_at: '2026-11-05T09:28:45Z',
-    },
-    {
-      id: 3,
-      site_url: 'https://dhl-supplychain.com',
-      site_name: 'DHL Logistics Hub',
-      activation_ip: '199.181.132.250',
-      status: 'Pending',
-      company_name: null,
-      physical_address: null,
-      telephone: null,
-      official_email: null,
-      website: 'https://dhl-supplychain.com',
-      linkedin_url: null,
-      twitter_url: null,
-      industry: null,
-      acquisition_channel: 'Direct Traffic',
-      created_at: '2026-11-05T10:05:12Z',
-    },
-    {
-      id: 4,
-      site_url: 'https://apexoutdoorgear.com',
-      site_name: 'Apex Outdoor Gear',
-      activation_ip: '73.189.44.110',
-      status: 'Pending',
-      company_name: null,
-      physical_address: null,
-      telephone: null,
-      official_email: null,
-      website: 'https://apexoutdoorgear.com',
-      linkedin_url: null,
-      twitter_url: null,
-      industry: 'Apparel & Sporting Goods',
-      acquisition_channel: 'Google Organic Search',
-      created_at: '2026-11-05T11:12:08Z',
-    },
-    {
-      id: 5,
-      site_url: 'http://localhost/wordpress_practice',
-      site_name: 'My Practice Site',
-      activation_ip: '127.0.0.1',
-      status: 'Pending',
-      company_name: null,
-      physical_address: null,
-      telephone: null,
-      official_email: null,
-      website: 'http://localhost/wordpress_practice',
-      linkedin_url: null,
-      twitter_url: null,
-      industry: 'E-Commerce Storefront',
-      acquisition_channel: 'Direct Traffic',
-      created_at: '2026-11-05T11:45:00Z',
-    },
-  ],
-  hits: [
-    {
-      id: 1,
-      target_store: 'http://localhost/wordpress_practice',
-      visitor_ip: '194.138.37.10',
-      visitor_id: 'usr_siemens_991',
-      matched_store_id: 1,
-      page_url: '/product/industrial-turbine-sensor',
-      referrer: 'https://www.google.com/search?q=industrial+turbine+sensor+specs',
-      screen_res: '1920x1080',
-      browser: 'Chrome',
-      duration_seconds: 420,
-      visited_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-    },
-    {
-      id: 2,
-      target_store: 'http://localhost/wordpress_practice',
-      visitor_ip: '194.138.37.10',
-      visitor_id: 'usr_siemens_991',
-      matched_store_id: 1,
-      page_url: '/pricing/enterprise-sla',
-      referrer: 'Direct Navigation',
-      screen_res: '1920x1080',
-      browser: 'Chrome',
-      duration_seconds: 185,
-      visited_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    },
-    {
-      id: 3,
-      target_store: 'http://localhost/wordpress_practice',
-      visitor_ip: '212.183.128.50',
-      visitor_id: 'usr_voda_442',
-      matched_store_id: 2,
-      page_url: '/solutions/5g-iot-gateway',
-      referrer: 'https://linkedin.com/feed',
-      screen_res: '1440x900',
-      browser: 'Safari',
-      duration_seconds: 310,
-      visited_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    },
-  ],
+  stores: [],
+  hits: [],
 };
 
 // ============================================================================
@@ -480,18 +383,16 @@ app.post('/api/v1/store/activate', async (req, res) => {
     const activationIp = getClientIp(req);
     const nowIso = new Date().toISOString();
 
-    if (useDatabase && dbPool) {
-      const query = `
-        INSERT INTO stores (site_url, site_name, activation_ip, status, created_at, updated_at)
-        VALUES ($1, $2, $3, 'Pending', NOW(), NOW())
-        ON CONFLICT (site_url) DO UPDATE
-        SET site_name = EXCLUDED.site_name,
-            activation_ip = EXCLUDED.activation_ip,
-            updated_at = NOW()
-        RETURNING *;
-      `;
-      const result = await dbPool.query(query, [cleanUrl, site_name || cleanUrl, activationIp]);
-      return res.json({ success: true, store: result.rows[0], activation_ip: activationIp });
+    if (getIsConnected()) {
+      const pool = getPool();
+      await pool.query(
+        `INSERT INTO svt_stores (site_url, site_name, activation_ip, status)
+         VALUES (?, ?, ?, 'Pending')
+         ON DUPLICATE KEY UPDATE site_name = VALUES(site_name), activation_ip = VALUES(activation_ip), updated_at = NOW()`,
+        [cleanUrl, site_name || cleanUrl, activationIp]
+      );
+      const [rows] = await pool.query('SELECT * FROM svt_stores WHERE site_url = ?', [cleanUrl]);
+      return res.json({ success: true, store: rows[0], activation_ip: activationIp });
     }
 
     let existing = memoryDb.stores.find((s) => s.site_url === cleanUrl);
@@ -539,27 +440,25 @@ app.post('/api/v1/track', async (req, res) => {
     let matchedStoreId = null;
     let matchedCompany = null;
 
-    if (useDatabase && dbPool) {
-      const matchQuery = `
-        SELECT id, company_name, site_name 
-        FROM stores 
-        WHERE activation_ip = $1 AND site_url != $2
-        LIMIT 1;
-      `;
-      const matchRes = await dbPool.query(matchQuery, [visitorIp, cleanTarget]);
-      if (matchRes.rows.length > 0) {
-        matchedStoreId = matchRes.rows[0].id;
-        matchedCompany = matchRes.rows[0].company_name || matchRes.rows[0].site_name;
+    if (getIsConnected()) {
+      const pool = getPool();
+      const [matchRes] = await pool.query(
+        'SELECT id, company_name, site_name FROM svt_stores WHERE activation_ip = ? AND site_url != ? LIMIT 1',
+        [visitorIp, cleanTarget]
+      );
+      if (matchRes.length > 0) {
+        matchedStoreId = matchRes[0].id;
+        matchedCompany = matchRes[0].company_name || matchRes[0].site_name;
       } else {
-        // Auto-Enrich new visitor IP in PostgreSQL mode
+        // Auto-Enrich new visitor IP in MySQL
         const enriched = await autoEnrichIp(visitorIp);
         if (enriched && enriched.found && enriched.company_name) {
           const insertQuery = `
-            INSERT INTO stores (site_url, site_name, activation_ip, status, company_name, physical_address, telephone, official_email, website, industry, acquisition_channel, created_at, updated_at)
-            VALUES ($1, $2, $3, 'Watching', $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-            RETURNING id, company_name;
+            INSERT INTO svt_stores (site_url, site_name, activation_ip, status, company_name, physical_address, telephone, official_email, website, industry, acquisition_channel)
+            VALUES (?, ?, ?, 'Watching', ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), physical_address = VALUES(physical_address);
           `;
-          const newStore = await dbPool.query(insertQuery, [
+          const [insertRes] = await pool.query(insertQuery, [
             enriched.website || cleanTarget,
             enriched.company_name,
             visitorIp,
@@ -568,20 +467,18 @@ app.post('/api/v1/track', async (req, res) => {
             enriched.telephone || '',
             enriched.official_email || '',
             enriched.website || '',
-            enriched.industry || 'B2B Commercial',
+            enriched.industry || 'B2B Enterprise',
             referrer?.includes('google') ? 'Google Organic Search' : 'Direct Navigation',
           ]);
-          if (newStore.rows.length > 0) {
-            matchedStoreId = newStore.rows[0].id;
-            matchedCompany = newStore.rows[0].company_name;
-          }
+          matchedStoreId = insertRes.insertId;
+          matchedCompany = enriched.company_name;
         }
       }
 
-      await dbPool.query(
-        `INSERT INTO visitor_hits (target_store, visitor_ip, visitor_id, matched_store_id, page_url, referrer, screen_res, browser, visited_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-        [cleanTarget, visitorIp, visitor_id, matchedStoreId, page_url || '/', referrer || '', screen_res || '1920x1080', browser]
+      await pool.query(
+        `INSERT INTO svt_visitor_hits (target_store, visitor_ip, visitor_id, matched_store_id, page_url, referrer, screen_res, browser, duration_seconds)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 60)`,
+        [cleanTarget, visitorIp, visitor_id, matchedStoreId, page_url || '/', referrer || 'Direct Navigation', screen_res || '1920x1080', browser]
       );
     } else {
       let match = memoryDb.stores.find((s) => s.activation_ip === visitorIp && s.site_url !== cleanTarget);
@@ -651,29 +548,59 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
     const cleanTarget = normalizeUrl(rawTarget);
 
     let companyList = [];
-    if (useDatabase && dbPool) {
+    if (getIsConnected()) {
+      const pool = getPool();
       const companiesQuery = `
         SELECT 
           s.id,
-          s.company_name,
-          s.status,
+          COALESCE(s.company_name, s.site_name) AS company_name,
+          LOWER(s.status) AS status,
           s.physical_address,
           s.telephone,
           s.official_email,
           s.website,
           s.linkedin_url,
           s.twitter_url,
+          s.industry,
+          s.is_partner_store,
           s.acquisition_channel,
-          COUNT(vh.id) as total_page_views,
-          COUNT(DISTINCT vh.visitor_id) as total_visits,
-          COALESCE(SUM(vh.duration_seconds), 0) as total_dwell_seconds
-        FROM visitor_hits vh
-        JOIN stores s ON s.id = vh.matched_store_id
-        WHERE vh.target_store = $1
+          COUNT(vh.id) AS total_page_views,
+          COUNT(DISTINCT vh.visitor_id) AS total_visits,
+          COALESCE(SUM(vh.duration_seconds), 0) AS total_dwell_seconds
+        FROM svt_visitor_hits vh
+        JOIN svt_stores s ON s.id = vh.matched_store_id
+        WHERE vh.target_store = ?
         GROUP BY s.id;
       `;
-      const compRes = await dbPool.query(companiesQuery, [cleanTarget]);
-      companyList = compRes.rows;
+      const [compRes] = await pool.query(companiesQuery, [cleanTarget]);
+      for (const comp of compRes) {
+        const [compHits] = await pool.query(
+          `SELECT id, page_url, referrer, browser, screen_res, duration_seconds, visited_at
+           FROM svt_visitor_hits
+           WHERE matched_store_id = ? AND target_store = ?
+           ORDER BY visited_at DESC
+           LIMIT 50`,
+          [comp.id, cleanTarget]
+        );
+        comp.hits = compHits;
+      }
+      companyList = compRes;
+
+      // Also query General Consumer / Residential visitor hits from MySQL
+      const [generalHits] = await pool.query(
+        `SELECT id, visitor_ip, page_url, referrer, screen_res, browser, duration_seconds, visited_at
+         FROM svt_visitor_hits
+         WHERE target_store = ? AND (matched_store_id IS NULL OR matched_store_id = 0)
+         ORDER BY visited_at DESC
+         LIMIT 100;`,
+        [cleanTarget]
+      );
+
+      return res.json({
+        companies: companyList,
+        general_visitors: generalHits,
+        total_consumer_visits: generalHits.length,
+      });
     } else {
       const hitsForStore = memoryDb.hits.filter(
         (h) => !cleanTarget || h.target_store === cleanTarget
@@ -717,22 +644,23 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
 // ============================================================================
 app.get('/api/v1/internal/admin/stats', requireStaffAuth, async (req, res) => {
   try {
-    if (useDatabase && dbPool) {
+    if (getIsConnected()) {
+      const pool = getPool();
       const statsQuery = `
         SELECT 
           COUNT(*) as total_stores,
-          COUNT(CASE WHEN DATE(created_at) = CURRENT_DATE THEN 1 END) as today_activated,
+          COUNT(CASE WHEN DATE(created_at) = CURRENT_DATE() THEN 1 END) as today_activated,
           COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_queue,
           COUNT(CASE WHEN status = 'Verified' THEN 1 END) as verified_count,
           COUNT(CASE WHEN status = 'Watching' THEN 1 END) as watching_count
-        FROM stores;
+        FROM svt_stores;
       `;
-      const stats = await dbPool.query(statsQuery);
-      const stores = await dbPool.query(`SELECT * FROM stores ORDER BY created_at DESC;`);
+      const [stats] = await pool.query(statsQuery);
+      const [stores] = await pool.query(`SELECT * FROM svt_stores ORDER BY created_at DESC;`);
 
       return res.json({
-        kpis: stats.rows[0],
-        stores: stores.rows,
+        kpis: stats[0],
+        stores,
       });
     }
 
@@ -778,20 +706,20 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
 
     const formattedStatus = status || 'Verified';
 
-    if (useDatabase && dbPool) {
+    if (getIsConnected()) {
+      const pool = getPool();
       const query = `
-        UPDATE stores 
-        SET company_name = $1,
-            physical_address = $2,
-            telephone = $3,
-            official_email = $4,
-            website = $5,
-            status = $6,
+        UPDATE svt_stores 
+        SET company_name = ?,
+            physical_address = ?,
+            telephone = ?,
+            official_email = ?,
+            website = ?,
+            status = ?,
             updated_at = NOW()
-        WHERE id = $7
-        RETURNING *;
+        WHERE id = ?;
       `;
-      const result = await dbPool.query(query, [
+      await pool.query(query, [
         company_name,
         physical_address,
         telephone,
@@ -800,7 +728,8 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
         formattedStatus,
         store_id,
       ]);
-      return res.json({ success: true, store: result.rows[0] });
+      const [updated] = await pool.query('SELECT * FROM svt_stores WHERE id = ?', [store_id]);
+      return res.json({ success: true, store: updated[0] });
     }
 
     const store = memoryDb.stores.find((s) => Number(s.id) === Number(store_id));
@@ -844,16 +773,17 @@ app.post('/api/v1/internal/admin/auto-enrich-batch', requireStaffAuth, async (re
   try {
     let enrichedCount = 0;
 
-    if (useDatabase && dbPool) {
-      const pendingRes = await dbPool.query(`SELECT id, activation_ip FROM stores WHERE status = 'Pending';`);
-      for (const store of pendingRes.rows) {
+    if (getIsConnected()) {
+      const pool = getPool();
+      const [pendingRes] = await pool.query("SELECT id, activation_ip FROM svt_stores WHERE status = 'Pending'");
+      for (const store of pendingRes) {
         if (!store.activation_ip) continue;
         const enriched = await autoEnrichIp(store.activation_ip);
         if (enriched && enriched.found && enriched.company_name) {
-          await dbPool.query(
-            `UPDATE stores 
-             SET company_name = $1, physical_address = $2, telephone = $3, official_email = $4, website = $5, industry = $6, status = 'Verified', updated_at = NOW()
-             WHERE id = $7;`,
+          await pool.query(
+            `UPDATE svt_stores 
+             SET company_name = ?, physical_address = ?, telephone = ?, official_email = ?, website = ?, industry = ?, status = 'Verified', updated_at = NOW()
+             WHERE id = ?;`,
             [
               enriched.company_name,
               enriched.physical_address || '',
@@ -867,7 +797,7 @@ app.post('/api/v1/internal/admin/auto-enrich-batch', requireStaffAuth, async (re
           enrichedCount++;
         }
       }
-      return res.json({ success: true, enrichedCount, totalPending: pendingRes.rows.length });
+      return res.json({ success: true, enrichedCount, totalPending: pendingRes.length });
     }
 
     const pendingStores = memoryDb.stores.filter((s) => (s.status || '').toLowerCase() === 'pending');
@@ -902,15 +832,25 @@ app.get('/staff-portal', (req, res) => {
 });
 
 // Default Health Route
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  const isDb = getIsConnected();
+  let count = memoryDb.stores.length;
+  if (isDb) {
+    try {
+      const [r] = await getPool().query('SELECT COUNT(*) as c FROM svt_stores');
+      count = r[0].c;
+    } catch (e) {}
+  }
   res.json({
     status: 'healthy',
-    mode: useDatabase ? 'PostgreSQL Active' : 'In-Memory Engine Active',
-    activeStores: memoryDb.stores.length,
+    mode: isDb ? 'MySQL Persistent Engine (wordpress_practice)' : 'In-Memory Engine Active',
+    database: isDb ? 'MySQL (127.0.0.1:3306)' : 'None (In-Memory Fallback)',
+    activeStores: count,
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await initDb();
   console.log(`🚀 Whoisvisiting Engine listening at http://localhost:${PORT}`);
   console.log(`🛡️  Internal Staff Portal UI served at http://localhost:${PORT}/staff-portal`);
 });
