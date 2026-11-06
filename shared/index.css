@@ -39,3 +39,19 @@
 .svt-pulsing-dot {
   animation: svt-pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Custom Scrollbar for Inner Tables and Cards */
+.svt-custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.svt-custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.svt-custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.svt-custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
