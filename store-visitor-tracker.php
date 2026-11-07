@@ -22,6 +22,18 @@ define( 'SVT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 /**
+ * Helper to retrieve Central Backend API URL.
+ * Supports override via constant SVT_CENTRAL_API_URL in wp-config.php,
+ * otherwise falls back to WordPress option or local dev default.
+ */
+function svt_get_api_url() {
+    if ( defined( 'SVT_CENTRAL_API_URL' ) && ! empty( SVT_CENTRAL_API_URL ) ) {
+        return untrailingslashit( esc_url_raw( SVT_CENTRAL_API_URL ) );
+    }
+    return untrailingslashit( esc_url_raw( get_option( 'svt_central_api_url', 'http://localhost:4000' ) ) );
+}
+
+/**
  * ----------------------------------------------------------------------------
  * 1. Zero-Friction Plugin Activation
  * ----------------------------------------------------------------------------
@@ -29,8 +41,8 @@ define( 'SVT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * queues an immediate redirect to the analytics dashboard.
  */
 function svt_zero_friction_activation() {
-    $api_base = get_option( 'svt_central_api_url', 'http://localhost:4000' );
-    $activate_endpoint = trailingslashit( esc_url_raw( $api_base ) ) . 'api/v1/store/activate';
+    $api_base = svt_get_api_url();
+    $activate_endpoint = trailingslashit( $api_base ) . 'api/v1/store/activate';
 
     $payload = array(
         'site_url'  => esc_url_raw( get_site_url() ),
@@ -84,8 +96,8 @@ function svt_inject_whoisvisiting_tracker() {
         return;
     }
 
-    $api_base   = get_option( 'svt_central_api_url', 'http://localhost:4000' );
-    $track_url  = trailingslashit( esc_url_raw( $api_base ) ) . 'api/v1/track';
+    $api_base   = svt_get_api_url();
+    $track_url  = trailingslashit( $api_base ) . 'api/v1/track';
     $store_url  = esc_url_raw( get_site_url() );
     ?>
 <!-- Whoisvisiting Telemetry Tracker -->
@@ -221,7 +233,7 @@ function svt_enqueue_whoisvisiting_assets( $hook_suffix ) {
 
         wp_localize_script( 'svt-bundle-js', 'svtSettings', array(
             'storeUrl' => esc_url( get_site_url() ),
-            'apiUrl'   => esc_url_raw( get_option( 'svt_central_api_url', 'http://localhost:4000' ) ),
+            'apiUrl'   => svt_get_api_url(),
             'siteName' => get_bloginfo( 'name' ),
             'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'svt_whois_nonce' ),

@@ -121,6 +121,7 @@ export default function MerchantDashboard() {
     return liveCompanies.map((c) => ({
       id: c.id,
       company_name: c.company_name || 'Unidentified Company',
+      activation_ip: c.activation_ip || c.hits?.[0]?.visitor_ip || 'Corporate Subnet',
       initials: (c.company_name || 'UC')
         .split(' ')
         .map((n) => n[0])
@@ -151,6 +152,7 @@ export default function MerchantDashboard() {
       total_page_views: c.total_page_views || 1,
       page_visits: (c.hits || []).map((h, i) => ({
         id: 'hit_' + (h.id || i),
+        visitor_ip: h.visitor_ip,
         status: 'active',
         date_time: formatHitTime(h.visited_at),
         duration: formatDuration(h.duration_seconds || 60),
@@ -470,6 +472,16 @@ export default function MerchantDashboard() {
 
                     {/* Contact Information */}
                     <div className="space-y-2.5 pt-2 border-t border-slate-100/80">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 flex items-center gap-1.5">
+                          <Globe className="w-3.5 h-3.5 text-blue-500" />
+                          Corporate IP
+                        </span>
+                        <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          {selectedCompany.activation_ip || selectedCompany.page_visits?.[0]?.visitor_ip || 'Corporate Subnet'}
+                        </span>
+                      </div>
+
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-500 flex items-center gap-1.5">
                           <Phone className="w-3.5 h-3.5 text-slate-400" />

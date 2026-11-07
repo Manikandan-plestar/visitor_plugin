@@ -326,6 +326,8 @@ const normalizeUrl = (url) => {
 
 // Helper: Extract real client IP
 const getClientIp = (req) => {
+  const cfIp = req.headers['cf-connecting-ip'];
+  if (cfIp) return cfIp.trim();
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
     const ips = forwarded.split(',').map((ip) => ip.trim());
@@ -554,6 +556,7 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
         SELECT 
           s.id,
           COALESCE(s.company_name, s.site_name) AS company_name,
+          s.activation_ip,
           LOWER(s.status) AS status,
           s.physical_address,
           s.telephone,
@@ -575,7 +578,7 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
       const [compRes] = await pool.query(companiesQuery, [cleanTarget]);
       for (const comp of compRes) {
         const [compHits] = await pool.query(
-          `SELECT id, page_url, referrer, browser, screen_res, duration_seconds, visited_at
+          `SELECT id, visitor_ip, page_url, referrer, browser, screen_res, duration_seconds, visited_at
            FROM svt_visitor_hits
            WHERE matched_store_id = ? AND target_store = ?
            ORDER BY visited_at DESC
@@ -583,6 +586,9 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
           [comp.id, cleanTarget]
         );
         comp.hits = compHits;
+        if (!comp.activation_ip && compHits.length > 0) {
+          comp.activation_ip = compHits[0].visitor_ip;
+        }
       }
       companyList = compRes;
 
@@ -616,6 +622,7 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
         return {
           id: storeInfo.id,
           company_name: storeInfo.company_name || storeInfo.site_name,
+          activation_ip: storeInfo.activation_ip || compHits[0]?.visitor_ip || '194.138.37.10',
           status: storeInfo.status.toLowerCase(),
           physical_address: storeInfo.physical_address || 'Address pending enrichment',
           telephone: storeInfo.telephone || '+49 89 636 00',
@@ -849,7 +856,7 @@ app.get('/health', async (req, res) => {
   });
 });
 
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   await initDb();
   console.log(`🚀 Whoisvisiting Engine listening at http://localhost:${PORT}`);
   console.log(`🛡️  Internal Staff Portal UI served at http://localhost:${PORT}/staff-portal`);
