@@ -1,6 +1,6 @@
-=== Store Visiting ===
+=== Amazer Analytics (Whois) ===
 Contributors: amazerplugins
-Tags: store visiting, visitor tracking, b2b intelligence, lead generation, analytics
+Tags: amazer analytics, whois analytics, visitor tracking, b2b intelligence, lead generation, analytics
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -12,7 +12,7 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal c
 
 == Description ==
 
-**Store Visiting** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
+**Amazer Analytics (Whois)** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
 
 ### Key Capabilities:
 * **Real-Time Reverse-IP Intelligence**: Automatically identifies corporate visitor networks, company names, industry, and corporate headquarters.
@@ -23,18 +23,18 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal c
 
 ### 3rd Party Service Disclosure
 This plugin relies on a 3rd-party SaaS API service to perform real-time reverse-IP resolution, geolocation lookup, and company enrichment:
-* **Service Provider**: Store Visiting Cloud API (by Amazer)
+* **Service Provider**: Amazer Cloud API (by Amazer)
 * **Service URL**: `https://apps.plestarinc.com:3011`
-* **Terms of Service**: https://amazer.in/terms
-* **Privacy Policy**: https://amazer.in/privacy
+* **Terms of Service**: https://apps.plestarinc.com:3011/terms
+* **Privacy Policy**: https://apps.plestarinc.com:3011/privacy
 
-When visitors browse your website, anonymous storefront telemetry (page URL, referrer, screen resolution, browser type, and public IP address) is securely transmitted via non-blocking browser beacon to the Store Visiting API to identify company details. No personal identifiable information (PII) like names or personal passwords is collected.
+When visitors browse your website, anonymous storefront telemetry (page URL, referrer, screen resolution, browser type, and public IP address) is securely transmitted via non-blocking browser beacon to the Amazer Analytics API to identify company details. No personal identifiable information (PII) like names or personal passwords is collected.
 
 == Installation ==
 
-1. Upload the `store-visiting` directory to the `/wp-content/plugins/` directory, or install the .zip directly via **Plugins > Add New > Upload Plugin** in WordPress.
+1. Upload the `amazer-whois-analytics` directory to the `/wp-content/plugins/` directory, or install the .zip directly via **Plugins > Add New > Upload Plugin** in WordPress.
 2. Activate the plugin through the **Plugins** menu in WordPress.
-3. Access the **Store Visiting** dashboard from the WordPress admin menu to monitor real-time company traffic.
+3. Access the **Amazer Analytics (Whois)** dashboard from the WordPress admin menu to monitor real-time company traffic.
 
 == Frequently Asked Questions ==
 
@@ -49,7 +49,7 @@ Yes. You can override the default API endpoint by adding `define( 'SVT_CENTRAL_A
 
 == Screenshots ==
 
-1. Store Visiting Dashboard - Real-time company reveal, corporate IP, and dwell time.
+1. Amazer Analytics (Whois) Dashboard - Real-time company reveal, corporate IP, and dwell time.
 2. Visit Journey Timeline - Detailed page-by-page browsing path and high-intent indicators.
 3. Dual Mode Switcher - Filter between All Identified corporate leads and General Visitors.
 

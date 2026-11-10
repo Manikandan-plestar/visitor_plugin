@@ -3,13 +3,13 @@
  * Node.js + Express REST API (Clean Separation: Zero Frontend HTML in Server)
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const dns = require('dns').promises;
 const http = require('http');
 const { initDb, getPool, getIsConnected } = require('./db');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -832,10 +832,124 @@ app.post('/api/v1/internal/admin/auto-enrich-batch', requireStaffAuth, async (re
 });
 
 // ============================================================================
-// 5. SERVE DEDICATED FRONTEND UI FILE
+// 5. SERVE DEDICATED FRONTEND UI FILE & LEGAL DISCLOSURES
 // ============================================================================
 app.get('/staff-portal', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'staff-portal.html'));
+});
+
+// Terms of Service (WordPress.org SaaS Compliance)
+app.get('/terms', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - Amazer Analytics (Whois)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background: #f8fafc; margin: 0; padding: 40px 20px; }
+    .container { max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    h1 { color: #0f172a; font-size: 28px; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+    h2 { color: #1e293b; font-size: 20px; margin-top: 28px; }
+    p, li { color: #475569; font-size: 15px; }
+    .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; margin-bottom: 16px; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #94a3b8; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">Amazer Cloud SaaS</span>
+    <h1>Terms of Service</h1>
+    <p><strong>Effective Date:</strong> November 10, 2026</p>
+    <p>Welcome to <strong>Amazer Analytics (Whois)</strong>, provided by Amazer ("we", "us", or "our"). By activating or utilizing our WordPress plugin and connecting to our central cloud intelligence service, you agree to these Terms of Service.</p>
+    
+    <h2>1. Description of Service</h2>
+    <p>Amazer Analytics (Whois) provides real-time B2B corporate visitor identification, reverse-IP resolution, and storefront analytics for website administrators and e-commerce merchants.</p>
+    
+    <h2>2. Permitted Use</h2>
+    <p>You may use this service solely to monitor website visits, analyze corporate audience interest, and optimize your business-to-business marketing. You agree not to reverse engineer or abuse the API infrastructure.</p>
+    
+    <h2>3. Data Ownership & Privacy</h2>
+    <p>You retain full ownership of your website data. We process anonymous storefront telemetry solely to perform corporate reverse-IP lookup and enrich lead intelligence on your behalf, in strict accordance with our Privacy Policy.</p>
+    
+    <h2>4. Availability & Support</h2>
+    <p>We strive to maintain continuous service availability with a 99.9% uptime target. Scheduled maintenance or service updates are performed with minimal disruption.</p>
+    
+    <h2>5. Contact Information</h2>
+    <p>For questions or assistance regarding these Terms, please contact our support team at <a href="mailto:support@plestar.net">support@plestar.net</a> or <a href="mailto:amazerinc@gmail.com">amazerinc@gmail.com</a>.</p>
+    
+    <div class="footer">
+      &copy; 2026 Amazer Analytics (Whois). All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+// Privacy Policy (WordPress.org SaaS Compliance)
+app.get('/privacy', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Amazer Analytics (Whois)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background: #f8fafc; margin: 0; padding: 40px 20px; }
+    .container { max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    h1 { color: #0f172a; font-size: 28px; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+    h2 { color: #1e293b; font-size: 20px; margin-top: 28px; }
+    p, li { color: #475569; font-size: 15px; }
+    .badge { display: inline-block; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; margin-bottom: 16px; }
+    .highlight { background: #f1f5f9; padding: 16px; border-radius: 8px; border-left: 4px solid #0284c7; margin: 16px 0; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #94a3b8; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">Privacy & Data Governance</span>
+    <h1>Privacy Policy</h1>
+    <p><strong>Effective Date:</strong> November 10, 2026</p>
+    <p>This Privacy Policy explains how <strong>Amazer Analytics (Whois)</strong> ("we", "us") collects, processes, and protects information when you use our WordPress plugin and connected cloud intelligence services.</p>
+    
+    <h2>1. Information We Collect</h2>
+    <p>Our plugin transmits non-blocking telemetry beacons from store visitors to resolve corporate reverse-IP information. The data collected includes:</p>
+    <ul>
+      <li><strong>Network Data:</strong> Public visitor IP address (used to query public Autonomous System Numbers and corporate subnets).</li>
+      <li><strong>Session Telemetry:</strong> Visited URL, referrer URL, browser type, operating system, and screen resolution.</li>
+      <li><strong>Timestamp & Duration:</strong> Time of arrival and dwell time on visited pages.</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Zero Personal Identifiable Information (No PII):</strong><br>
+      We do NOT collect visitor names, personal email addresses, phone numbers, payment details, form inputs, or user passwords. Our system is specifically architected to identify business entities and public corporate network ranges, not private individuals.
+    </div>
+
+    <h2>2. Purpose of Processing</h2>
+    <p>The collected telemetry is processed strictly to:</p>
+    <ul>
+      <li>Identify corporate networks and organizations browsing the merchant's store.</li>
+      <li>Provide lead intent scoring (e.g., distinguishing visits to product specs, pricing, and checkout).</li>
+      <li>Protect against bot traffic and automated scrapers.</li>
+    </ul>
+
+    <h2>3. GDPR & International Privacy Compliance</h2>
+    <p>Our service adheres to GDPR and privacy-by-design standards. IP addresses are pseudonymized and queried against public business registries (WHOIS, ARIN, RIPE, APNIC). Telemetry is transmitted over secure encrypted connections (HTTPS / TLS).</p>
+
+    <h2>4. Data Retention</h2>
+    <p>Telemetry records and corporate hit histories are retained for analytics reporting and can be purged upon request by store administrators.</p>
+
+    <h2>5. Contact Us</h2>
+    <p>For any privacy inquiries, data subject requests, or questions regarding this policy, please reach out to <a href="mailto:amazerinc@gmail.com">amazerinc@gmail.com</a> or <a href="mailto:support@plestar.net">support@plestar.net</a>.</p>
+
+    <div class="footer">
+      &copy; 2026 Amazer Analytics (Whois). All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`);
 });
 
 // Default Health Route
@@ -850,8 +964,8 @@ app.get('/health', async (req, res) => {
   }
   res.json({
     status: 'healthy',
-    mode: isDb ? 'MySQL Persistent Engine (wordpress_practice)' : 'In-Memory Engine Active',
-    database: isDb ? 'MySQL (127.0.0.1:3306)' : 'None (In-Memory Fallback)',
+    mode: isDb ? `MySQL Persistent Engine (${process.env.DB_NAME || 'store_visiting'})` : 'In-Memory Engine Active',
+    database: isDb ? `MySQL (${process.env.DB_HOST || '127.0.0.1'}:${process.env.DB_PORT || '3306'})` : 'None (In-Memory Fallback)',
     activeStores: count,
   });
 });

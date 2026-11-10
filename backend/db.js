@@ -4,28 +4,33 @@
  * with automatic table migrations and seed data.
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const mysql = require('mysql2/promise');
 
 let pool = null;
 let isConnected = false;
 
-const DB_CONFIG = {
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'wordpress_practice',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-};
+function getDbConfig() {
+  return {
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT || '3306', 10),
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'wordpress_practice',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  };
+}
 
 async function initDb() {
+  const config = getDbConfig();
   try {
-    pool = mysql.createPool(DB_CONFIG);
+    pool = mysql.createPool(config);
     // Test initial connection
     const conn = await pool.getConnection();
-    console.log(`✅ Connected to MySQL database "${DB_CONFIG.database}" at ${DB_CONFIG.host}:${DB_CONFIG.port}`);
+    console.log(`✅ Connected to MySQL database "${config.database}" at ${config.host}:${config.port}`);
     conn.release();
 
     // Create Tables
@@ -35,9 +40,9 @@ async function initDb() {
     await seedInitialData();
 
     isConnected = true;
-    return { success: true, engine: 'MySQL', database: DB_CONFIG.database };
+    return { success: true, engine: 'MySQL', database: config.database };
   } catch (err) {
-    console.warn(`⚠️ MySQL connection to "${DB_CONFIG.database}" failed (${err.message}). Using in-memory fallback.`);
+    console.warn(`⚠️ MySQL connection to "${config.database}" failed (${err.message}). Using in-memory fallback.`);
     isConnected = false;
     return { success: false, engine: 'In-Memory', error: err.message };
   }

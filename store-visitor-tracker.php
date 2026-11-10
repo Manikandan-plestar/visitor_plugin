@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Store Visiting
- * Plugin URI: https://amazer.in/store-visiting
+ * Plugin Name: Amazer Analytics (Whois)
+ * Plugin URI: https://amazer.in/amazer-whois-analytics
  * Description: Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal company names, corporate IPs, dwell time, and visited pages without form submissions.
  * Version: 1.0.0
  * Requires at least: 5.8
@@ -10,7 +10,7 @@
  * Author URI: https://amazer.in
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: store-visiting
+ * Text Domain: amazer-whois-analytics
  */
 
 // Deny direct script execution
@@ -32,9 +32,20 @@ function svt_get_api_url() {
     if ( defined( 'SVT_CENTRAL_API_URL' ) && ! empty( SVT_CENTRAL_API_URL ) ) {
         return untrailingslashit( esc_url_raw( SVT_CENTRAL_API_URL ) );
     }
-    // Local dev: 'http://localhost:4000'
-    // Live Cloud Backend: 'https://apps.plestarinc.com:3011'
-    return untrailingslashit( esc_url_raw( get_option( 'svt_central_api_url', 'https://apps.plestarinc.com:3011' ) ) );
+
+    $saved_option = get_option( 'svt_central_api_url' );
+    if ( ! empty( $saved_option ) ) {
+        return untrailingslashit( esc_url_raw( $saved_option ) );
+    }
+
+    // Automatically use local backend on localhost, and cloud backend on live websites
+    $host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '';
+    if ( strpos( $host, 'localhost' ) !== false || strpos( $host, '127.0.0.1' ) !== false ) {
+        return 'http://localhost:4000';
+    }
+
+    // Live Cloud Backend Default
+    return 'https://apps.plestarinc.com:3011';
 }
 
 /**
@@ -104,8 +115,8 @@ function svt_enqueue_storefront_tracker() {
     $store_url  = esc_url_raw( get_site_url() );
 
     // Register script handle to cleanly attach inline telemetry script via wp_enqueue_script
-    wp_register_script( 'store-visiting-tracker', false, array(), SVT_VERSION, true );
-    wp_enqueue_script( 'store-visiting-tracker' );
+    wp_register_script( 'amazer-whois-tracker', false, array(), SVT_VERSION, true );
+    wp_enqueue_script( 'amazer-whois-tracker' );
 
     $tracker_js = "(function() {
         'use strict';
@@ -166,7 +177,7 @@ function svt_enqueue_storefront_tracker() {
         } catch (ex) {}
     })();";
 
-    wp_add_inline_script( 'store-visiting-tracker', $tracker_js );
+    wp_add_inline_script( 'amazer-whois-tracker', $tracker_js );
 }
 add_action( 'wp_enqueue_scripts', 'svt_enqueue_storefront_tracker' );
 
@@ -177,8 +188,8 @@ add_action( 'wp_enqueue_scripts', 'svt_enqueue_storefront_tracker' );
  */
 function svt_register_admin_dashboard_menu() {
     add_menu_page(
-        __( 'Store Visiting', 'store-visiting' ),
-        __( 'Store Visiting', 'store-visiting' ),
+        __( 'Amazer Analytics (Whois)', 'amazer-whois-analytics' ),
+        __( 'Amazer Analytics (Whois)', 'amazer-whois-analytics' ),
         'manage_options',
         'svt-dashboard',
         'svt_render_dashboard_container',
@@ -189,8 +200,8 @@ function svt_register_admin_dashboard_menu() {
     // Keep alias for network analytics slug
     add_submenu_page(
         null,
-        __( 'Network Analytics', 'store-visiting' ),
-        __( 'Network Analytics', 'store-visiting' ),
+        __( 'Network Analytics', 'amazer-whois-analytics' ),
+        __( 'Network Analytics', 'amazer-whois-analytics' ),
         'manage_options',
         'svt-network-analytics',
         'svt_render_dashboard_container'
@@ -272,7 +283,7 @@ function svt_ajax_save_endpoint() {
     }
 
     wp_send_json_success( array(
-        'message' => __( 'Endpoint configuration updated successfully.', 'store-visiting' ),
+        'message' => __( 'Endpoint configuration updated successfully.', 'amazer-whois-analytics' ),
         'apiUrl'  => get_option( 'svt_central_api_url' ),
     ) );
 }
@@ -288,8 +299,8 @@ function svt_render_dashboard_container() {
         <div id="svt-dashboard-root">
             <?php if ( ! file_exists( $bundle_js ) ) : ?>
                 <div style="padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 20px; max-width: 650px;">
-                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Store Visiting Dashboard', 'store-visiting' ); ?></h2>
-                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Store Visiting dashboard:', 'store-visiting' ); ?></p>
+                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer Analytics (Whois) Dashboard', 'amazer-whois-analytics' ); ?></h2>
+                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer Analytics (Whois) dashboard:', 'amazer-whois-analytics' ); ?></p>
                     <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 6px;">npm run build</pre>
                 </div>
             <?php endif; ?>
