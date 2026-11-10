@@ -39,7 +39,8 @@ import {
 export default function MerchantDashboard() {
   const wpSettings = window.svtSettings || {
     storeUrl: 'http://localhost/wordpress_practice',
-    apiUrl: 'http://localhost:4000',
+    // apiUrl: 'http://localhost:4000', // Local Dev
+    apiUrl: 'https://apps.plestarinc.com:3011', // Live Backend Server
     siteName: 'My Storefront',
     ajaxUrl: '/wp-admin/admin-ajax.php',
     nonce: '',
@@ -229,7 +230,7 @@ export default function MerchantDashboard() {
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 svt-pulsing-dot"></span>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              Whoisvisiting
+              Store Visiting
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">
                 B2B Intelligence
               </span>

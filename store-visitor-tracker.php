@@ -1,14 +1,16 @@
 <?php
 /**
- * Plugin Name:       Store Visitor & Company Intelligence (Whoisvisiting)
- * Plugin URI:        https://yourcompany.com/visitor-intelligence
- * Description:       B2B Visitor Intelligence & Company Reveal platform matching the Whoisvisiting UI. Zero-friction activation, automatic reverse-IP detection, and rich company profiles.
- * Version:           3.0.0
- * Author:            Your Company
- * Author URI:        https://yourcompany.com
- * License:           GPL-2.0+
- * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain:       store-visitor-tracker
+ * Plugin Name: Store Visiting
+ * Plugin URI: https://amazer.in/store-visiting
+ * Description: Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal company names, corporate IPs, dwell time, and visited pages without form submissions.
+ * Version: 1.0.0
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
+ * Author: Amazer
+ * Author URI: https://amazer.in
+ * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: store-visiting
  */
 
 // Deny direct script execution
@@ -16,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SVT_VERSION', '3.0.0' );
+define( 'SVT_VERSION', '1.0.0' );
 define( 'SVT_PLUGIN_FILE', __FILE__ );
 define( 'SVT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -30,7 +32,9 @@ function svt_get_api_url() {
     if ( defined( 'SVT_CENTRAL_API_URL' ) && ! empty( SVT_CENTRAL_API_URL ) ) {
         return untrailingslashit( esc_url_raw( SVT_CENTRAL_API_URL ) );
     }
-    return untrailingslashit( esc_url_raw( get_option( 'svt_central_api_url', 'http://localhost:4000' ) ) );
+    // Local dev: 'http://localhost:4000'
+    // Live Cloud Backend: 'https://apps.plestarinc.com:3011'
+    return untrailingslashit( esc_url_raw( get_option( 'svt_central_api_url', 'https://apps.plestarinc.com:3011' ) ) );
 }
 
 /**
@@ -80,12 +84,11 @@ add_action( 'admin_init', 'svt_handle_activation_redirect' );
 
 /**
  * ----------------------------------------------------------------------------
- * 2. Storefront Telemetry Tracker (wp_footer)
+ * 2. Storefront Telemetry Tracker (wp_enqueue_scripts)
  * ----------------------------------------------------------------------------
- * Injected on public storefront pages. Generates persistent client UUID and
- * transmits beacon via navigator.sendBeacon (with fetch keepalive fallback).
+ * Registered and enqueued according to WordPress Plugin Review standards.
  */
-function svt_inject_whoisvisiting_tracker() {
+function svt_enqueue_storefront_tracker() {
     // Strictly skip admin, cron, ajax, or REST calls
     if ( is_admin() || wp_doing_ajax() || wp_doing_cron() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
         return;
@@ -99,73 +102,73 @@ function svt_inject_whoisvisiting_tracker() {
     $api_base   = svt_get_api_url();
     $track_url  = trailingslashit( $api_base ) . 'api/v1/track';
     $store_url  = esc_url_raw( get_site_url() );
-    ?>
-<!-- Whoisvisiting Telemetry Tracker -->
-<script type="text/javascript" id="svt-whoisvisiting-beacon">
-(function() {
-    'use strict';
-    try {
-        var storageKey = '_svt_vid';
-        var visitorId = null;
 
+    // Register script handle to cleanly attach inline telemetry script via wp_enqueue_script
+    wp_register_script( 'store-visiting-tracker', false, array(), SVT_VERSION, true );
+    wp_enqueue_script( 'store-visiting-tracker' );
+
+    $tracker_js = "(function() {
+        'use strict';
         try {
-            visitorId = window.localStorage.getItem(storageKey);
-        } catch (e) {}
-
-        if (!visitorId) {
-            var randPart = '';
-            if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-                var bytes = new Uint8Array(8);
-                window.crypto.getRandomValues(bytes);
-                for (var i = 0; i < bytes.length; i++) {
-                    randPart += ('0' + bytes[i].toString(16)).slice(-2);
-                }
-            } else {
-                randPart = Math.random().toString(36).substring(2, 10);
-            }
-            visitorId = 'usr_' + Date.now().toString(36) + '_' + randPart;
+            var storageKey = '_svt_vid';
+            var visitorId = null;
             try {
-                window.localStorage.setItem(storageKey, visitorId);
+                visitorId = window.localStorage.getItem(storageKey);
             } catch (e) {}
-        }
 
-        var payload = {
-            target_store: <?php echo wp_json_encode( $store_url ); ?>,
-            visitor_id: visitorId,
-            page_url: window.location.pathname || '/',
-            referrer: document.referrer || '',
-            screen_res: (window.screen ? window.screen.width + 'x' + window.screen.height : 'unknown'),
-            timestamp: new Date().toISOString()
-        };
-
-        var endpoint = <?php echo wp_json_encode( $track_url ); ?>;
-        var dataStr = JSON.stringify(payload);
-        var sent = false;
-
-        if (typeof navigator.sendBeacon === 'function') {
-            try {
-                var blob = new Blob([dataStr], { type: 'application/json' });
-                sent = navigator.sendBeacon(endpoint, blob);
-            } catch (err) {
-                sent = false;
+            if (!visitorId) {
+                var randPart = '';
+                if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+                    var bytes = new Uint8Array(8);
+                    window.crypto.getRandomValues(bytes);
+                    for (var i = 0; i < bytes.length; i++) {
+                        randPart += ('0' + bytes[i].toString(16)).slice(-2);
+                    }
+                } else {
+                    randPart = Math.random().toString(36).substring(2, 10);
+                }
+                visitorId = 'usr_' + Date.now().toString(36) + '_' + randPart;
+                try {
+                    window.localStorage.setItem(storageKey, visitorId);
+                } catch (e) {}
             }
-        }
 
-        if (!sent && typeof fetch === 'function') {
-            fetch(endpoint, {
-                method: 'POST',
-                keepalive: true,
-                headers: { 'Content-Type': 'application/json' },
-                body: dataStr
-            }).catch(function() {});
-        }
-    } catch (ex) {}
-})();
-</script>
-<!-- /Whoisvisiting Telemetry Tracker -->
-    <?php
+            var payload = {
+                target_store: " . wp_json_encode( $store_url ) . ",
+                visitor_id: visitorId,
+                page_url: window.location.pathname || '/',
+                referrer: document.referrer || '',
+                screen_res: (window.screen ? window.screen.width + 'x' + window.screen.height : 'unknown'),
+                timestamp: new Date().toISOString()
+            };
+
+            var endpoint = " . wp_json_encode( $track_url ) . ";
+            var dataStr = JSON.stringify(payload);
+            var sent = false;
+
+            if (typeof navigator.sendBeacon === 'function') {
+                try {
+                    var blob = new Blob([dataStr], { type: 'application/json' });
+                    sent = navigator.sendBeacon(endpoint, blob);
+                } catch (err) {
+                    sent = false;
+                }
+            }
+
+            if (!sent && typeof fetch === 'function') {
+                fetch(endpoint, {
+                    method: 'POST',
+                    keepalive: true,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: dataStr
+                }).catch(function() {});
+            }
+        } catch (ex) {}
+    })();";
+
+    wp_add_inline_script( 'store-visiting-tracker', $tracker_js );
 }
-add_action( 'wp_footer', 'svt_inject_whoisvisiting_tracker', 999 );
+add_action( 'wp_enqueue_scripts', 'svt_enqueue_storefront_tracker' );
 
 /**
  * ----------------------------------------------------------------------------
@@ -174,8 +177,8 @@ add_action( 'wp_footer', 'svt_inject_whoisvisiting_tracker', 999 );
  */
 function svt_register_admin_dashboard_menu() {
     add_menu_page(
-        __( 'Visitor Intelligence', 'store-visitor-tracker' ),
-        __( 'Visitor Intelligence', 'store-visitor-tracker' ),
+        __( 'Store Visiting', 'store-visiting' ),
+        __( 'Store Visiting', 'store-visiting' ),
         'manage_options',
         'svt-dashboard',
         'svt_render_dashboard_container',
@@ -186,8 +189,8 @@ function svt_register_admin_dashboard_menu() {
     // Keep alias for network analytics slug
     add_submenu_page(
         null,
-        __( 'Network Analytics', 'store-visitor-tracker' ),
-        __( 'Network Analytics', 'store-visitor-tracker' ),
+        __( 'Network Analytics', 'store-visiting' ),
+        __( 'Network Analytics', 'store-visiting' ),
         'manage_options',
         'svt-network-analytics',
         'svt_render_dashboard_container'
@@ -246,8 +249,8 @@ add_action( 'admin_enqueue_scripts', 'svt_enqueue_whoisvisiting_assets' );
  * Filter script tag to output type="module" for Vite ES module bundle
  */
 function svt_enable_es_module_script( $tag, $handle, $src ) {
-    if ( 'svt-bundle-js' === $handle ) {
-        return '<script type="module" src="' . esc_url( $src ) . '" id="svt-bundle-js-js"></script>' . "\n";
+    if ( 'svt-bundle-js' === $handle && false === strpos( $tag, 'type="module"' ) ) {
+        $tag = str_replace( '<script ', '<script type="module" ', $tag );
     }
     return $tag;
 }
@@ -269,7 +272,7 @@ function svt_ajax_save_endpoint() {
     }
 
     wp_send_json_success( array(
-        'message' => __( 'Endpoint configuration updated successfully.', 'store-visitor-tracker' ),
+        'message' => __( 'Endpoint configuration updated successfully.', 'store-visiting' ),
         'apiUrl'  => get_option( 'svt_central_api_url' ),
     ) );
 }
@@ -285,8 +288,8 @@ function svt_render_dashboard_container() {
         <div id="svt-dashboard-root">
             <?php if ( ! file_exists( $bundle_js ) ) : ?>
                 <div style="padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 20px; max-width: 650px;">
-                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Whoisvisiting Dashboard', 'store-visitor-tracker' ); ?></h2>
-                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Whoisvisiting dashboard:', 'store-visitor-tracker' ); ?></p>
+                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Store Visiting Dashboard', 'store-visiting' ); ?></h2>
+                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Store Visiting dashboard:', 'store-visiting' ); ?></p>
                     <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 6px;">npm run build</pre>
                 </div>
             <?php endif; ?>
