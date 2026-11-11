@@ -23,10 +23,10 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal c
 
 ### 3rd Party Service Disclosure
 This plugin relies on a 3rd-party SaaS API service to perform real-time reverse-IP resolution, geolocation lookup, and company enrichment:
-* **Service Provider**: Amazer Cloud API (by Amazer)
+* **Service Provider**: Amazer Cloud API (by Plestar Inc.)
 * **Service URL**: `https://apps.plestarinc.com:3011`
-* **Terms of Service**: https://apps.plestarinc.com:3011/terms
-* **Privacy Policy**: https://apps.plestarinc.com:3011/privacy
+* **Terms of Service**: https://plestar.net/amazer-analytics/terms.html
+* **Privacy Policy**: https://plestar.net/amazer-analytics/privacy.html
 
 When visitors browse your website, anonymous storefront telemetry (page URL, referrer, screen resolution, browser type, and public IP address) is securely transmitted via non-blocking browser beacon to the Amazer Analytics API to identify company details. No personal identifiable information (PII) like names or personal passwords is collected.
 
