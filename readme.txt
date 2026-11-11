@@ -2,7 +2,7 @@
 Contributors: amazerplugins
 Tags: amazer analytics, whois analytics, visitor tracking, b2b intelligence, lead generation
 Requires at least: 5.8
-Tested up to: 6.7
+Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPL-2.0-or-later
