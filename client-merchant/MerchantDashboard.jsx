@@ -233,7 +233,7 @@ export default function MerchantDashboard() {
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 svt-pulsing-dot"></span>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              Amazer Analytics (Whois)
+              Amazer Analytics(WHOIS Visitors)
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">
                 B2B Intelligence
               </span>

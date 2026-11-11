@@ -1,18 +1,18 @@
-=== Amazer Analytics (Whois) ===
+=== Amazer Analytics(WHOIS Visitors) ===
 Contributors: amazerplugins
-Tags: amazer analytics, whois analytics, visitor tracking, b2b intelligence, lead generation, analytics
+Tags: amazer analytics, whois analytics, visitor tracking, b2b intelligence, lead generation
 Requires at least: 5.8
-Tested up to: 7.1
+Tested up to: 6.7
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal companies visiting your store before they fill out a form.
+Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal company names, corporate IPs, dwell time, and visited pages without form submissions.
 
 == Description ==
 
-**Amazer Analytics (Whois)** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
+**Amazer Analytics(WHOIS Visitors)** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
 
 ### Key Capabilities:
 * **Real-Time Reverse-IP Intelligence**: Automatically identifies corporate visitor networks, company names, industry, and corporate headquarters.
@@ -24,39 +24,29 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal c
 ### 3rd Party Service Disclosure
 This plugin relies on a 3rd-party SaaS API service to perform real-time reverse-IP resolution, geolocation lookup, and company enrichment:
 * **Service Provider**: Amazer Cloud API (by Plestar Inc.)
-* **Service URL**: `https://apps.plestarinc.com:3011`
+* **Service URL**: https://apps.plestarinc.com:3011
 * **Terms of Service**: https://plestar.net/amazer-analytics/terms.html
 * **Privacy Policy**: https://plestar.net/amazer-analytics/privacy.html
 
-When visitors browse your website, anonymous storefront telemetry (page URL, referrer, screen resolution, browser type, and public IP address) is securely transmitted via non-blocking browser beacon to the Amazer Analytics API to identify company details. No personal identifiable information (PII) like names or personal passwords is collected.
-
 == Installation ==
 
-1. Upload the `amazer-whois-analytics` directory to the `/wp-content/plugins/` directory, or install the .zip directly via **Plugins > Add New > Upload Plugin** in WordPress.
+1. Upload the plugin folder `amazer-whois-analytics` to `/wp-content/plugins/` directory, or upload the `.zip` archive via **Plugins > Add New > Upload Plugin**.
 2. Activate the plugin through the **Plugins** menu in WordPress.
-3. Access the **Amazer Analytics (Whois)** dashboard from the WordPress admin menu to monitor real-time company traffic.
+3. Once activated, storefront visitor telemetry begins capturing automatically.
+4. Access the full intelligence portal under **Amazer Analytics(WHOIS Visitors)** in your WordPress admin menu.
 
 == Frequently Asked Questions ==
 
-= Does this track logged-in administrators? =
-No. For accuracy and data hygiene, the plugin intentionally filters out logged-in store administrators from traffic metrics.
+= Does this plugin slow down my store? =
+No. Visitor telemetry is dispatched asynchronously using the browser's native `navigator.sendBeacon` API. If `sendBeacon` is unsupported, it falls back to a non-blocking background fetch call that never impedes page render time or customer experience.
 
-= Does this slow down my website? =
-Not at all. Storefront tracking executes asynchronously using the native browser `navigator.sendBeacon` API with zero impact on page load times.
+= How does reverse-IP intelligence work? =
+When a business visitor lands on your store, their corporate IP address is cross-referenced with public WHOIS registries, corporate ASN subnets, and the central B2B knowledge network to resolve company names, headquarters, and industry vertical.
 
-= Can I use a custom backend API URL? =
-Yes. You can override the default API endpoint by adding `define( 'SVT_CENTRAL_API_URL', 'https://your-custom-endpoint' );` to your `wp-config.php` file.
-
-== Screenshots ==
-
-1. Amazer Analytics (Whois) Dashboard - Real-time company reveal, corporate IP, and dwell time.
-2. Visit Journey Timeline - Detailed page-by-page browsing path and high-intent indicators.
-3. Dual Mode Switcher - Filter between All Identified corporate leads and General Visitors.
+= Where are Terms and Privacy hosted? =
+Full Terms of Service and Privacy Policy are available at https://plestar.net/amazer-analytics/terms.html and https://plestar.net/amazer-analytics/privacy.html.
 
 == Changelog ==
 
 = 1.0.0 =
-* Initial public release on WordPress.org.
-* Real-time B2B reverse-IP corporate detection.
-* Corporate IP display and visit journey timeline.
-* Asynchronous telemetry beacon.
+* Initial public release with real-time reverse-IP lookup, dual intelligence feed, and zero-friction activation.

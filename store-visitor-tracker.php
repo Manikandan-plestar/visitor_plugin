@@ -1,13 +1,13 @@
 <?php
 /**
- * Plugin Name: Amazer Analytics (Whois)
- * Plugin URI: https://amazer.in/amazer-whois-analytics
+ * Plugin Name: Amazer Analytics(WHOIS Visitors)
+ * Plugin URI: https://amazerinc.com/amazer-analytics.html
  * Description: Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal company names, corporate IPs, dwell time, and visited pages without form submissions.
  * Version: 1.0.0
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Author: Amazer
- * Author URI: https://amazer.in
+ * Author URI: https://amazerinc.com/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: amazer-whois-analytics
@@ -52,8 +52,7 @@ function svt_get_api_url() {
  * ----------------------------------------------------------------------------
  * 1. Zero-Friction Plugin Activation
  * ----------------------------------------------------------------------------
- * No forms, no manual API keys. Dispatches silent background registration and
- * queues an immediate redirect to the analytics dashboard.
+ * Dispatches silent non-blocking background registration to central backend.
  */
 function svt_zero_friction_activation() {
     $api_base = svt_get_api_url();
@@ -73,25 +72,22 @@ function svt_zero_friction_activation() {
         'body'        => wp_json_encode( $payload ),
         'blocking'    => false, // Asynchronous to prevent any activation delay
     ) );
-
-    // Queue one-time automatic redirect to plugin dashboard
-    set_transient( 'svt_activation_redirect', 1, 60 );
 }
 register_activation_hook( __FILE__, 'svt_zero_friction_activation' );
 
 /**
- * Perform immediate redirect to the dashboard upon activation
+ * Add direct Dashboard link on the Plugins list screen
  */
-function svt_handle_activation_redirect() {
-    if ( get_transient( 'svt_activation_redirect' ) ) {
-        delete_transient( 'svt_activation_redirect' );
-        if ( ! isset( $_GET['activate-multi'] ) && current_user_can( 'manage_options' ) ) {
-            wp_safe_redirect( admin_url( 'admin.php?page=svt-dashboard' ) );
-            exit;
-        }
-    }
+function svt_add_action_links( $links ) {
+    $dashboard_link = sprintf(
+        '<a href="%s">%s</a>',
+        esc_url( admin_url( 'admin.php?page=svt-dashboard' ) ),
+        esc_html__( 'Dashboard', 'amazer-whois-analytics' )
+    );
+    array_unshift( $links, $dashboard_link );
+    return $links;
 }
-add_action( 'admin_init', 'svt_handle_activation_redirect' );
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'svt_add_action_links' );
 
 /**
  * ----------------------------------------------------------------------------
@@ -105,7 +101,7 @@ function svt_enqueue_storefront_tracker() {
         return;
     }
 
-    // Do not track the store owner when browsing their own site!
+    // Do not track the store owner when browsing their own site
     if ( current_user_can( 'manage_options' ) ) {
         return;
     }
@@ -128,25 +124,16 @@ function svt_enqueue_storefront_tracker() {
             } catch (e) {}
 
             if (!visitorId) {
-                var randPart = '';
-                if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-                    var bytes = new Uint8Array(8);
-                    window.crypto.getRandomValues(bytes);
-                    for (var i = 0; i < bytes.length; i++) {
-                        randPart += ('0' + bytes[i].toString(16)).slice(-2);
-                    }
-                } else {
-                    randPart = Math.random().toString(36).substring(2, 10);
-                }
-                visitorId = 'usr_' + Date.now().toString(36) + '_' + randPart;
+                visitorId = 'v_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
                 try {
                     window.localStorage.setItem(storageKey, visitorId);
                 } catch (e) {}
             }
 
             var payload = {
-                target_store: " . wp_json_encode( $store_url ) . ",
                 visitor_id: visitorId,
+                store_url: " . wp_json_encode( $store_url ) . ",
+                page_title: document.title || '',
                 page_url: window.location.pathname || '/',
                 referrer: document.referrer || '',
                 screen_res: (window.screen ? window.screen.width + 'x' + window.screen.height : 'unknown'),
@@ -188,8 +175,8 @@ add_action( 'wp_enqueue_scripts', 'svt_enqueue_storefront_tracker' );
  */
 function svt_register_admin_dashboard_menu() {
     add_menu_page(
-        __( 'Amazer Analytics (Whois)', 'amazer-whois-analytics' ),
-        __( 'Amazer Analytics (Whois)', 'amazer-whois-analytics' ),
+        __( 'Amazer Analytics(WHOIS Visitors)', 'amazer-whois-analytics' ),
+        __( 'Amazer Analytics(WHOIS Visitors)', 'amazer-whois-analytics' ),
         'manage_options',
         'svt-dashboard',
         'svt_render_dashboard_container',
@@ -213,11 +200,7 @@ add_action( 'admin_menu', 'svt_register_admin_dashboard_menu' );
  * Enqueue Dashboard Assets on plugin page
  */
 function svt_enqueue_whoisvisiting_assets( $hook_suffix ) {
-    $current_page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
-    $is_svt_page  = in_array( $current_page, array( 'svt-dashboard', 'svt-network-analytics', 'svt-intelligence' ), true );
-
-    if ( ! $is_svt_page &&
-         strpos( (string) $hook_suffix, 'svt-dashboard' ) === false &&
+    if ( strpos( (string) $hook_suffix, 'svt-dashboard' ) === false &&
          strpos( (string) $hook_suffix, 'svt-network-analytics' ) === false &&
          strpos( (string) $hook_suffix, 'svt-intelligence' ) === false ) {
         return;
@@ -240,7 +223,7 @@ function svt_enqueue_whoisvisiting_assets( $hook_suffix ) {
         wp_enqueue_script(
             'svt-bundle-js',
             SVT_PLUGIN_URL . 'dist/bundle.js',
-            array(),
+            array( 'wp-element' ),
             filemtime( $bundle_js ),
             true
         );
@@ -299,8 +282,8 @@ function svt_render_dashboard_container() {
         <div id="svt-dashboard-root">
             <?php if ( ! file_exists( $bundle_js ) ) : ?>
                 <div style="padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 20px; max-width: 650px;">
-                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer Analytics (Whois) Dashboard', 'amazer-whois-analytics' ); ?></h2>
-                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer Analytics (Whois) dashboard:', 'amazer-whois-analytics' ); ?></p>
+                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer Analytics(WHOIS Visitors) Dashboard', 'amazer-whois-analytics' ); ?></h2>
+                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer Analytics(WHOIS Visitors) dashboard:', 'amazer-whois-analytics' ); ?></p>
                     <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 6px;">npm run build</pre>
                 </div>
             <?php endif; ?>

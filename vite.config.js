@@ -1,15 +1,28 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      jsxRuntime: 'classic',
+    }),
+  ],
+  resolve: {
+    alias: [
+      { find: /^react-dom\/client$/, replacement: path.resolve(__dirname, 'wp-element-shim.js') },
+      { find: /^react-dom$/, replacement: path.resolve(__dirname, 'wp-element-shim.js') },
+      { find: /^react\/jsx-runtime$/, replacement: path.resolve(__dirname, 'wp-element-shim.js') },
+      { find: /^react\/jsx-dev-runtime$/, replacement: path.resolve(__dirname, 'wp-element-shim.js') },
+      { find: /^react$/, replacement: path.resolve(__dirname, 'wp-element-shim.js') },
+    ],
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {
         bundle: 'client-merchant/index.jsx',
-        staff: 'staff-portal/staffEntry.jsx',
       },
       output: {
         entryFileNames: '[name].js',
