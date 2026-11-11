@@ -706,6 +706,8 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
       telephone,
       official_email,
       website,
+      industry,
+      activation_ip,
       status,
     } = req.body;
 
@@ -719,11 +721,13 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
       const pool = getPool();
       const query = `
         UPDATE svt_stores 
-        SET company_name = ?,
-            physical_address = ?,
-            telephone = ?,
-            official_email = ?,
-            website = ?,
+        SET company_name = COALESCE(?, company_name),
+            physical_address = COALESCE(?, physical_address),
+            telephone = COALESCE(?, telephone),
+            official_email = COALESCE(?, official_email),
+            website = COALESCE(?, website),
+            industry = COALESCE(?, industry),
+            activation_ip = COALESCE(?, activation_ip),
             status = ?,
             updated_at = NOW()
         WHERE id = ?;
@@ -734,6 +738,8 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
         telephone,
         official_email,
         website,
+        industry,
+        activation_ip,
         formattedStatus,
         store_id,
       ]);
@@ -746,11 +752,13 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
       return res.status(404).json({ error: 'Store not found' });
     }
 
-    store.company_name = company_name || store.company_name;
-    store.physical_address = physical_address || store.physical_address;
-    store.telephone = telephone || store.telephone;
-    store.official_email = official_email || store.official_email;
-    store.website = website || store.website;
+    if (company_name !== undefined) store.company_name = company_name;
+    if (physical_address !== undefined) store.physical_address = physical_address;
+    if (telephone !== undefined) store.telephone = telephone;
+    if (official_email !== undefined) store.official_email = official_email;
+    if (website !== undefined) store.website = website;
+    if (industry !== undefined) store.industry = industry;
+    if (activation_ip !== undefined) store.activation_ip = activation_ip;
     store.status = formattedStatus;
     store.updated_at = new Date().toISOString();
 
@@ -758,6 +766,84 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
   } catch (err) {
     console.error('Error in /internal/admin/enrich-store:', err);
     res.status(500).json({ error: 'Failed to enrich store' });
+  }
+});
+
+// Create Store / Company Manually from Staff Portal
+app.post('/api/v1/internal/admin/create-store', requireStaffAuth, async (req, res) => {
+  try {
+    const {
+      site_url,
+      site_name,
+      activation_ip,
+      company_name,
+      physical_address,
+      telephone,
+      official_email,
+      website,
+      industry,
+      status,
+    } = req.body;
+
+    if (!site_url) {
+      return res.status(400).json({ error: 'site_url is required' });
+    }
+
+    const formattedStatus = status || 'Verified';
+    const cleanSiteUrl = normalizeUrl(site_url);
+
+    if (getIsConnected()) {
+      const pool = getPool();
+      const insertQuery = `
+        INSERT INTO svt_stores 
+        (site_url, site_name, activation_ip, company_name, physical_address, telephone, official_email, website, industry, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          company_name = VALUES(company_name),
+          physical_address = VALUES(physical_address),
+          telephone = VALUES(telephone),
+          official_email = VALUES(official_email),
+          website = VALUES(website),
+          industry = VALUES(industry),
+          status = VALUES(status);
+      `;
+      await pool.query(insertQuery, [
+        cleanSiteUrl,
+        site_name || company_name || 'Manual Store',
+        activation_ip || null,
+        company_name || site_name,
+        physical_address || null,
+        telephone || null,
+        official_email || null,
+        website || cleanSiteUrl,
+        industry || 'B2B Enterprise',
+        formattedStatus,
+      ]);
+
+      const [newStore] = await pool.query('SELECT * FROM svt_stores WHERE site_url = ?', [cleanSiteUrl]);
+      return res.json({ success: true, store: newStore[0] });
+    }
+
+    const newStore = {
+      id: Date.now(),
+      site_url: cleanSiteUrl,
+      site_name: site_name || company_name,
+      activation_ip: activation_ip || '127.0.0.1',
+      company_name: company_name || site_name,
+      physical_address,
+      telephone,
+      official_email,
+      website: website || cleanSiteUrl,
+      industry: industry || 'B2B Enterprise',
+      status: formattedStatus,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    memoryDb.stores.push(newStore);
+    res.json({ success: true, store: newStore });
+  } catch (err) {
+    console.error('Error in /internal/admin/create-store:', err);
+    res.status(500).json({ error: 'Failed to create store' });
   }
 });
 
