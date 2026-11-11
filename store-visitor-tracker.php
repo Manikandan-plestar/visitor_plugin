@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Amazer Analytics(WHOIS Visitors)
  * Plugin URI: https://amazerinc.com/amazer-analytics.html
- * Description: Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal company names, corporate IPs, dwell time, and visited pages without form submissions.
+ * Description: Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal visiting company names, corporate IPs, and pages without forms.
  * Version: 1.0.0
  * Requires at least: 5.8
  * Requires PHP: 7.4

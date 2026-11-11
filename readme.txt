@@ -8,7 +8,7 @@ Stable tag: 1.0.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal company names, corporate IPs, dwell time, and visited pages without form submissions.
+Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal visiting company names, corporate IPs, and pages without forms.
 
 == Description ==
 
