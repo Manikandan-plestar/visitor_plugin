@@ -314,8 +314,10 @@ const autoEnrichIp = async (rawIp) => {
 app.use(cors());
 app.use(express.json());
 
-// Serve Static Frontend Assets from /public and /dist
+// Serve Static Frontend Assets from /public and /dist (supports both root and subfolder layouts)
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname)));
+app.use('/dist', express.static(path.join(__dirname, 'dist')));
 app.use('/dist', express.static(path.join(__dirname, '..', 'dist')));
 
 // Helper: Normalize URL
@@ -835,7 +837,11 @@ app.post('/api/v1/internal/admin/auto-enrich-batch', requireStaffAuth, async (re
 // 5. SERVE DEDICATED FRONTEND UI FILE & LEGAL DISCLOSURES
 // ============================================================================
 app.get('/staff-portal', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'staff-portal.html'));
+  const file1 = path.join(__dirname, 'public', 'staff-portal.html');
+  const file2 = path.join(__dirname, 'staff-portal.html');
+  if (require('fs').existsSync(file1)) return res.sendFile(file1);
+  if (require('fs').existsSync(file2)) return res.sendFile(file2);
+  res.sendFile(file1);
 });
 
 // Terms of Service (WordPress.org SaaS Compliance)
