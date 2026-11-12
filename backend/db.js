@@ -10,6 +10,7 @@ const mysql = require('mysql2/promise');
 
 let pool = null;
 let isConnected = false;
+let currentDbName = process.env.DB_NAME || 'store_visiting';
 
 function getDbConfig() {
   return {
@@ -17,7 +18,7 @@ function getDbConfig() {
     port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'wordpress_practice',
+    database: process.env.DB_NAME || 'store_visiting',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -28,9 +29,11 @@ async function initDb() {
   const config = getDbConfig();
   try {
     pool = mysql.createPool(config);
-    // Test initial connection
+    // Test initial connection and query active database name from MySQL
     const conn = await pool.getConnection();
-    console.log(`✅ Connected to MySQL database "${config.database}" at ${config.host}:${config.port}`);
+    const [dbResult] = await conn.query('SELECT DATABASE() AS current_db');
+    currentDbName = dbResult[0]?.current_db || config.database;
+    console.log(`✅ Connected to MySQL database "${currentDbName}" at ${config.host}:${config.port}`);
     conn.release();
 
     // Create Tables
@@ -40,10 +43,11 @@ async function initDb() {
     await seedInitialData();
 
     isConnected = true;
-    return { success: true, engine: 'MySQL', database: config.database };
+    return { success: true, engine: 'MySQL', database: currentDbName };
   } catch (err) {
     console.warn(`⚠️ MySQL connection to "${config.database}" failed (${err.message}). Using in-memory fallback.`);
     isConnected = false;
+    currentDbName = 'In-Memory Fallback';
     return { success: false, engine: 'In-Memory', error: err.message };
   }
 }
@@ -276,9 +280,14 @@ function getIsConnected() {
   return isConnected;
 }
 
+function getCurrentDbName() {
+  return currentDbName;
+}
+
 module.exports = {
   initDb,
   getPool,
   getIsConnected,
+  getCurrentDbName,
 };
 

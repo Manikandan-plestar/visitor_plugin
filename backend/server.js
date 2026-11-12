@@ -9,7 +9,10 @@ const express = require('express');
 const cors = require('cors');
 const dns = require('dns').promises;
 const http = require('http');
-const { initDb, getPool, getIsConnected } = require('./db');
+const https = require('https');
+const fs = require('fs');
+const { initDb, getPool, getIsConnected, getCurrentDbName } = require('./db');
+const getActiveDbName = () => (typeof getCurrentDbName === 'function' ? getCurrentDbName() : (process.env.DB_NAME || 'store_visiting'));
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -608,6 +611,8 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
         companies: companyList,
         general_visitors: generalHits,
         total_consumer_visits: generalHits.length,
+        db_name: getActiveDbName(),
+        is_connected: true,
       });
     } else {
       const hitsForStore = memoryDb.hits.filter(
@@ -641,7 +646,12 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
       });
     }
 
-    res.json({ companies: companyList });
+    res.json({
+      companies: companyList,
+      general_visitors: [],
+      db_name: getActiveDbName(),
+      is_connected: getIsConnected(),
+    });
   } catch (err) {
     console.error('Error in /analytics/visitor-detail:', err);
     res.status(500).json({ error: 'Failed to fetch visitor detail' });
@@ -1056,14 +1066,44 @@ app.get('/health', async (req, res) => {
   }
   res.json({
     status: 'healthy',
-    mode: isDb ? `MySQL Persistent Engine (${process.env.DB_NAME || 'store_visiting'})` : 'In-Memory Engine Active',
-    database: isDb ? `MySQL (${process.env.DB_HOST || '127.0.0.1'}:${process.env.DB_PORT || '3306'})` : 'None (In-Memory Fallback)',
+    mode: isDb ? `MySQL Persistent Engine (${getActiveDbName()})` : 'In-Memory Engine Active',
+    database: isDb ? `MySQL (${getActiveDbName()} at ${process.env.DB_HOST || '127.0.0.1'}:${process.env.DB_PORT || '3306'})` : 'None (In-Memory Fallback)',
+    db_name: getActiveDbName(),
     activeStores: count,
   });
 });
 
-app.listen(PORT, '0.0.0.0', async () => {
+// Start server with native SSL (HTTPS) support if certificates are available
+const localSslKey = path.join(__dirname, 'ssl', 'privkey.pem');
+const localSslCert = path.join(__dirname, 'ssl', 'fullchain.pem');
+const liveSslKey = process.env.SSL_KEY_PATH || '/etc/letsencrypt/live/apps.plestarinc.com/privkey.pem';
+const liveSslCert = process.env.SSL_CERT_PATH || '/etc/letsencrypt/live/apps.plestarinc.com/fullchain.pem';
+
+let server;
+let isHttps = false;
+
+const keyPath = fs.existsSync(localSslKey) ? localSslKey : (fs.existsSync(liveSslKey) ? liveSslKey : null);
+const certPath = fs.existsSync(localSslCert) ? localSslCert : (fs.existsSync(liveSslCert) ? liveSslCert : null);
+
+if (keyPath && certPath) {
+  try {
+    const sslOptions = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+    };
+    server = https.createServer(sslOptions, app);
+    isHttps = true;
+    console.log(`🔒 HTTPS Server initialized using certificates: ${certPath}`);
+  } catch (err) {
+    console.warn(`⚠️ Could not initialize HTTPS (${err.message}). Falling back to HTTP.`);
+    server = http.createServer(app);
+  }
+} else {
+  server = http.createServer(app);
+}
+
+server.listen(PORT, '0.0.0.0', async () => {
   await initDb();
-  console.log(`🚀 Whoisvisiting Engine listening at http://localhost:${PORT}`);
-  console.log(`🛡️  Internal Staff Portal UI served at http://localhost:${PORT}/staff-portal`);
+  console.log(`🚀 Whoisvisiting Engine listening at ${isHttps ? 'https' : 'http'}://0.0.0.0:${PORT}`);
+  console.log(`🛡️  Internal Staff Portal UI served at ${isHttps ? 'https' : 'http'}://apps.plestarinc.com:${PORT}/staff-portal`);
 });

@@ -58,6 +58,10 @@ export default function MerchantDashboard() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [testPingStatus, setTestPingStatus] = useState(null);
+  const [dbInfo, setDbInfo] = useState({
+    name: 'store_visiting',
+    connected: true,
+  });
 
   // Quick Test Beacon Ping
   const handleTestPing = async () => {
@@ -107,6 +111,12 @@ export default function MerchantDashboard() {
       }
       if (data.general_visitors) {
         setGeneralVisitors(data.general_visitors);
+      }
+      if (data.db_name) {
+        setDbInfo({
+          name: data.db_name,
+          connected: data.is_connected !== false,
+        });
       }
     } catch (err) {
       setErrorMsg(`Could not connect to database backend at ${wpSettings.apiUrl}. Ensure the backend service is running.`);
@@ -248,8 +258,8 @@ export default function MerchantDashboard() {
         {/* Live MySQL Database Controls */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>MySQL: wordpress_practice</span>
+            <span className={`w-2 h-2 rounded-full ${dbInfo.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+            <span>MySQL: {dbInfo.name}</span>
           </span>
 
           <button
