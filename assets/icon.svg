@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1329" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Glowing Outer Rim -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#2563eb" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0.6" />
+    </linearGradient>
+
+    <!-- Radar Pulse Wave Gradient -->
+    <radialGradient id="radarGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.25" />
+      <stop offset="60%" stop-color="#2563eb" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Letter A Primary Gradient (Left Leg) -->
+    <linearGradient id="legLeft" x1="0%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="60%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+
+    <!-- Letter A Primary Gradient (Right Leg) -->
+    <linearGradient id="legRight" x1="100%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#4338ca" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#67e8f9" />
+    </linearGradient>
+
+    <!-- Crossbar Beam Gradient -->
+    <linearGradient id="beamGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="intenseGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="16" result="blur2" />
+      <feComposite in="SourceGraphic" in2="blur2" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Container with Rounded Corners -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="url(#rimGrad)" stroke-width="3" opacity="0.7" />
+
+  <!-- Radar Concentric Tracking Waves -->
+  <circle cx="256" cy="270" r="190" fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="4 8" opacity="0.6" />
+  <circle cx="256" cy="270" r="140" fill="none" stroke="#334155" stroke-width="1.5" opacity="0.4" />
+  <circle cx="256" cy="270" r="90" fill="url(#radarGlow)" />
+  <circle cx="256" cy="270" r="90" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.3" />
+
+  <!-- Radar Sweep Ray -->
+  <path d="M 256 270 L 390 180 A 190 190 0 0 0 340 135 Z" fill="#38bdf8" opacity="0.08" />
+
+  <!-- Constellation Network Nodes (B2B Visitor Tracking IPs) -->
+  <circle cx="160" cy="180" r="4" fill="#38bdf8" opacity="0.7" filter="url(#glow)" />
+  <circle cx="360" cy="210" r="5" fill="#60a5fa" opacity="0.8" filter="url(#glow)" />
+  <circle cx="140" cy="350" r="3.5" fill="#818cf8" opacity="0.6" />
+  <circle cx="370" cy="340" r="4" fill="#38bdf8" opacity="0.7" />
+
+  <!-- Network Connection Links -->
+  <line x1="160" y1="180" x2="256" y2="120" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="3 3" />
+  <line x1="360" y1="210" x2="256" y2="120" stroke="#60a5fa" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="3 3" />
+  <line x1="140" y1="350" x2="190" y2="350" stroke="#818cf8" stroke-width="1" stroke-opacity="0.2" />
+  <line x1="370" y1="340" x2="322" y2="350" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.2" />
+
+  <!-- Main Hero Icon: Geometric Monogram "A" with WHOIS Optical Iris -->
+  <g filter="url(#glow)">
+    <!-- Left Leg -->
+    <path d="M 256 100 L 140 370 L 195 370 L 256 210 Z" fill="url(#legLeft)" />
+
+    <!-- Right Leg -->
+    <path d="M 256 100 L 256 210 L 317 370 L 372 370 Z" fill="url(#legRight)" />
+
+    <!-- Center Apex Shimmer -->
+    <polygon points="256,100 240,150 256,165 272,150" fill="#ffffff" opacity="0.9" />
+
+    <!-- Horizontal Telemetry Scanner Beam (Crossbar of "A") -->
+    <path d="M 175 285 L 337 285 L 348 305 L 164 305 Z" fill="url(#beamGrad)" />
+
+    <!-- Laser Scanning Core Dot -->
+    <circle cx="256" cy="295" r="7" fill="#ffffff" filter="url(#intenseGlow)" />
+    <circle cx="256" cy="295" r="3" fill="#38bdf8" />
+  </g>
+
+  <!-- Pulsing Orbit Ring in Center of "A" (Representing WHOIS IP Radar) -->
+  <ellipse cx="256" cy="295" rx="55" ry="18" fill="none" stroke="#67e8f9" stroke-width="2" opacity="0.85" transform="rotate(-8 256 295)" />
+  <ellipse cx="256" cy="295" rx="75" ry="24" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="6 6" opacity="0.4" transform="rotate(-8 256 295)" />
+
+  <!-- Apex Beacon Flare -->
+  <circle cx="256" cy="100" r="10" fill="#67e8f9" opacity="0.7" filter="url(#intenseGlow)" />
+  <circle cx="256" cy="100" r="4" fill="#ffffff" />
+</svg>
+

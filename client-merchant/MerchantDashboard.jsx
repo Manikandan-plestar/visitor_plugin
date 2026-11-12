@@ -29,7 +29,6 @@ import {
   Filter,
   X,
   Flame,
-  Radio,
   Send,
   Users,
   Info,
@@ -57,38 +56,6 @@ export default function MerchantDashboard() {
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'GENERAL'
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [testPingStatus, setTestPingStatus] = useState(null);
-  const [dbInfo, setDbInfo] = useState({
-    name: 'store_visiting',
-    connected: true,
-  });
-
-  // Quick Test Beacon Ping
-  const handleTestPing = async () => {
-    setTestPingStatus('sending');
-    try {
-      const res = await fetch(`${wpSettings.apiUrl}/api/v1/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target_store: wpSettings.storeUrl,
-          visitor_id: 'live_test_' + Date.now().toString(36),
-          page_url: '/product/industrial-turbine-sensor',
-          referrer: 'https://www.google.com/search?q=test+live+visitor',
-          screen_res: `${window.innerWidth}x${window.innerHeight}`,
-        }),
-      });
-      if (res.ok) {
-        setTestPingStatus('success');
-        setTimeout(() => setTestPingStatus(null), 3000);
-        fetchLiveAnalytics();
-      } else {
-        setTestPingStatus('error');
-      }
-    } catch (e) {
-      setTestPingStatus('error');
-    }
-  };
 
   // Fetch Live Analytics Data from Central Express Node Backend (Connected to MySQL)
   const fetchLiveAnalytics = async () => {
@@ -111,12 +78,6 @@ export default function MerchantDashboard() {
       }
       if (data.general_visitors) {
         setGeneralVisitors(data.general_visitors);
-      }
-      if (data.db_name) {
-        setDbInfo({
-          name: data.db_name,
-          connected: data.is_connected !== false,
-        });
       }
     } catch (err) {
       setErrorMsg(`Could not connect to database backend at ${wpSettings.apiUrl}. Ensure the backend service is running.`);
@@ -255,30 +216,16 @@ export default function MerchantDashboard() {
           </p>
         </div>
 
-        {/* Live MySQL Database Controls */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-            <span className={`w-2 h-2 rounded-full ${dbInfo.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-            <span>MySQL: {dbInfo.name}</span>
-          </span>
-
-          <button
-            type="button"
-            onClick={handleTestPing}
-            disabled={testPingStatus === 'sending'}
-            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs flex items-center gap-1.5 transition-all"
-          >
-            <Radio className={`w-3.5 h-3.5 text-blue-500 ${testPingStatus === 'sending' ? 'animate-spin' : ''}`} />
-            <span>{testPingStatus === 'success' ? '✓ Hit Saved in DB' : 'Ping Live Hit'}</span>
-          </button>
-
+        {/* Top Controls */}
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={fetchLiveAnalytics}
-            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-600 shadow-2xs transition-all"
-            title="Refresh feed from MySQL"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-all flex items-center gap-1.5"
+            title="Refresh analytics data"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
@@ -700,18 +647,10 @@ export default function MerchantDashboard() {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
           <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800">No Identified Companies in Database</h3>
+          <h3 className="text-base font-bold text-slate-800">No Identified Companies Yet</h3>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            When corporate visitors browse your store, their company records and page visits will appear here directly from MySQL.
+            When corporate visitors browse your store, their company details and page visits will appear here automatically in real time.
           </p>
-          <button
-            type="button"
-            onClick={handleTestPing}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1.5"
-          >
-            <Radio className="w-3.5 h-3.5" />
-            <span>Simulate Incoming B2B Visitor Hit</span>
-          </button>
         </div>
       )
     ) : (
@@ -788,18 +727,10 @@ export default function MerchantDashboard() {
           {groupedGeneralVisitors.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
               <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-slate-800">No General Consumer Visitors Recorded</h3>
+              <h3 className="text-base font-bold text-slate-800">No General Visitors Recorded Yet</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                 Non-corporate consumer traffic from residential broadband and mobile networks will be listed here.
               </p>
-              <button
-                type="button"
-                onClick={handleTestPing}
-                className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1.5"
-              >
-                <Radio className="w-3.5 h-3.5" />
-                <span>Simulate Visitor Hit</span>
-              </button>
             </div>
           ) : (
             <div className="flex flex-row gap-6 items-stretch w-full overflow-x-auto pb-4">
