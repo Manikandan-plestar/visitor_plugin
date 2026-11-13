@@ -91,9 +91,189 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'svt_add_actio
 
 /**
  * ----------------------------------------------------------------------------
- * 2. Storefront Telemetry Tracker (wp_enqueue_scripts)
+ * 2. 5-Minute Batch Sync & Local Log Queue Infrastructure
  * ----------------------------------------------------------------------------
- * Registered and enqueued according to WordPress Plugin Review standards.
+ */
+
+/**
+ * Register 5-Minute Cron Interval
+ */
+function svt_add_five_minute_cron_interval( $schedules ) {
+    $schedules['every_five_minutes'] = array(
+        'interval' => 300, // 300 seconds = 5 minutes
+        'display'  => esc_html__( 'Every 5 Minutes', 'amazer-whois-analytics' ),
+    );
+    return $schedules;
+}
+add_filter( 'cron_schedules', 'svt_add_five_minute_cron_interval' );
+
+/**
+ * Schedule 5-minute background batch sync
+ */
+function svt_init_batch_cron() {
+    if ( ! wp_next_scheduled( 'svt_five_minute_batch_sync' ) ) {
+        wp_schedule_event( time() + 300, 'every_five_minutes', 'svt_five_minute_batch_sync' );
+    }
+}
+add_action( 'init', 'svt_init_batch_cron' );
+
+/**
+ * Clear cron on plugin deactivation
+ */
+function svt_deactivate_batch_cron() {
+    wp_clear_scheduled_hook( 'svt_five_minute_batch_sync' );
+}
+register_deactivation_hook( __FILE__, 'svt_deactivate_batch_cron' );
+
+/**
+ * Helper: Retrieve local logs directory path
+ */
+function svt_get_log_dir() {
+    $upload_dir = wp_upload_dir();
+    $log_dir = trailingslashit( $upload_dir['basedir'] ) . 'svt-logs';
+
+    if ( ! file_exists( $log_dir ) ) {
+        wp_mkdir_p( $log_dir );
+        @file_put_contents( $log_dir . '/index.php', '<?php // Silence is golden.' );
+        @file_put_contents( $log_dir . '/.htaccess', 'Deny from all' );
+    }
+
+    return $log_dir;
+}
+
+/**
+ * Helper: Retrieve local pending hits log file path
+ */
+function svt_get_pending_hits_file() {
+    return trailingslashit( svt_get_log_dir() ) . 'pending-hits.log';
+}
+
+/**
+ * Register Local REST API Endpoint for Instant Local Hit Logging
+ */
+function svt_register_local_logging_route() {
+    register_rest_route( 'svt/v1', '/log', array(
+        'methods'             => 'POST',
+        'callback'            => 'svt_handle_local_hit_log',
+        'permission_callback' => '__return_true', // Public endpoint for storefront visitor telemetry
+    ) );
+}
+add_action( 'rest_api_init', 'svt_register_local_logging_route' );
+
+/**
+ * Handle incoming storefront hit: saves to local log with zero external network calls
+ */
+function svt_handle_local_hit_log( $request ) {
+    $client_ip = '';
+    if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+        $client_ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+    } elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+        $parts = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
+        $client_ip = trim( $parts[0] );
+    } elseif ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+        $client_ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+    }
+
+    $params = $request->get_json_params();
+    if ( empty( $params ) ) {
+        $params = $request->get_params();
+    }
+
+    $hit_record = array(
+        'visitor_id'       => isset( $params['visitor_id'] ) ? sanitize_text_field( $params['visitor_id'] ) : 'v_anon',
+        'visitor_ip'       => $client_ip ?: '127.0.0.1',
+        'page_url'         => isset( $params['page_url'] ) ? sanitize_text_field( $params['page_url'] ) : '/',
+        'referrer'         => isset( $params['referrer'] ) ? sanitize_text_field( $params['referrer'] ) : 'Direct Navigation',
+        'screen_res'       => isset( $params['screen_res'] ) ? sanitize_text_field( $params['screen_res'] ) : '1920x1080',
+        'browser'          => isset( $params['browser'] ) ? sanitize_text_field( $params['browser'] ) : 'Chrome',
+        'duration_seconds' => isset( $params['duration_seconds'] ) ? intval( $params['duration_seconds'] ) : 60,
+        'visited_at'       => isset( $params['timestamp'] ) ? sanitize_text_field( $params['timestamp'] ) : gmdate( 'Y-m-d\TH:i:s\Z' ),
+    );
+
+    $log_file = svt_get_pending_hits_file();
+    @file_put_contents( $log_file, wp_json_encode( $hit_record ) . "\n", FILE_APPEND | LOCK_EX );
+
+    return new WP_REST_Response( array( 'logged' => true ), 200 );
+}
+
+/**
+ * Core Flush Routine: Reads pending local log file and pushes bulk batch to central server
+ */
+function svt_flush_pending_hits() {
+    $log_file = svt_get_pending_hits_file();
+    if ( ! file_exists( $log_file ) || filesize( $log_file ) === 0 ) {
+        return 0;
+    }
+
+    // Atomic rename so new incoming hits continue logging to a fresh file smoothly
+    $sync_file = trailingslashit( svt_get_log_dir() ) . 'pending-hits-syncing-' . time() . '.log';
+    if ( ! @rename( $log_file, $sync_file ) ) {
+        return 0;
+    }
+
+    $content = @file_get_contents( $sync_file );
+    if ( empty( $content ) ) {
+        @unlink( $sync_file );
+        return 0;
+    }
+
+    $lines = explode( "\n", trim( $content ) );
+    $hits = array();
+    foreach ( $lines as $line ) {
+        $line = trim( $line );
+        if ( empty( $line ) ) continue;
+        $decoded = json_decode( $line, true );
+        if ( is_array( $decoded ) ) {
+            $hits[] = $decoded;
+        }
+    }
+
+    if ( empty( $hits ) ) {
+        @unlink( $sync_file );
+        return 0;
+    }
+
+    $api_base = svt_get_api_url();
+    $batch_endpoint = trailingslashit( $api_base ) . 'api/v1/track/batch';
+
+    $payload = array(
+        'target_store' => esc_url_raw( get_site_url() ),
+        'hits'         => $hits,
+    );
+
+    $response = wp_remote_post( $batch_endpoint, array(
+        'method'      => 'POST',
+        'timeout'     => 15,
+        'redirection' => 2,
+        'headers'     => array( 'Content-Type' => 'application/json' ),
+        'body'        => wp_json_encode( $payload ),
+    ) );
+
+    if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
+        @unlink( $sync_file );
+        return count( $hits );
+    } else {
+        // Network or server temporarily down; restore unsynced hits back into pending log
+        @file_put_contents( $log_file, $content, FILE_APPEND | LOCK_EX );
+        @unlink( $sync_file );
+        return 0;
+    }
+}
+add_action( 'svt_five_minute_batch_sync', 'svt_flush_pending_hits' );
+
+/**
+ * On-demand flush AJAX handler for instant dashboard refresh
+ */
+function svt_ajax_flush_batch() {
+    check_ajax_referer( 'svt_whois_nonce', 'nonce' );
+    $count = svt_flush_pending_hits();
+    wp_send_json_success( array( 'synced_count' => (int) $count ) );
+}
+add_action( 'wp_ajax_svt_flush_batch', 'svt_ajax_flush_batch' );
+
+/**
+ * Storefront Telemetry Tracker (wp_enqueue_scripts)
+ * Sends beacon locally to WordPress REST endpoint with zero external network latency
  */
 function svt_enqueue_storefront_tracker() {
     // Strictly skip admin, cron, ajax, or REST calls
@@ -106,11 +286,10 @@ function svt_enqueue_storefront_tracker() {
         return;
     }
 
-    $api_base   = svt_get_api_url();
-    $track_url  = trailingslashit( $api_base ) . 'api/v1/track';
-    $store_url  = esc_url_raw( get_site_url() );
+    $local_endpoint  = esc_url_raw( rest_url( 'svt/v1/log' ) );
+    $remote_endpoint = trailingslashit( svt_get_api_url() ) . 'api/v1/track';
+    $store_url       = esc_url_raw( get_site_url() );
 
-    // Register script handle to cleanly attach inline telemetry script via wp_enqueue_script
     wp_register_script( 'amazer-whois-tracker', false, array(), SVT_VERSION, true );
     wp_enqueue_script( 'amazer-whois-tracker' );
 
@@ -130,36 +309,50 @@ function svt_enqueue_storefront_tracker() {
                 } catch (e) {}
             }
 
+            var ua = navigator.userAgent || '';
+            var browser = 'Chrome';
+            if (ua.indexOf('Firefox') > -1) browser = 'Firefox';
+            else if (ua.indexOf('Safari') > -1 && ua.indexOf('Chrome') === -1) browser = 'Safari';
+            else if (ua.indexOf('Edg') > -1) browser = 'Edge';
+
             var payload = {
                 visitor_id: visitorId,
                 store_url: " . wp_json_encode( $store_url ) . ",
                 page_title: document.title || '',
                 page_url: window.location.pathname || '/',
-                referrer: document.referrer || '',
+                referrer: document.referrer || 'Direct Navigation',
                 screen_res: (window.screen ? window.screen.width + 'x' + window.screen.height : 'unknown'),
+                browser: browser,
+                duration_seconds: 60,
                 timestamp: new Date().toISOString()
             };
 
-            var endpoint = " . wp_json_encode( $track_url ) . ";
+            var localUrl = " . wp_json_encode( $local_endpoint ) . ";
+            var remoteUrl = " . wp_json_encode( $remote_endpoint ) . ";
             var dataStr = JSON.stringify(payload);
             var sent = false;
 
             if (typeof navigator.sendBeacon === 'function') {
                 try {
                     var blob = new Blob([dataStr], { type: 'application/json' });
-                    sent = navigator.sendBeacon(endpoint, blob);
+                    sent = navigator.sendBeacon(localUrl, blob);
                 } catch (err) {
                     sent = false;
                 }
             }
 
             if (!sent && typeof fetch === 'function') {
-                fetch(endpoint, {
+                fetch(localUrl, {
                     method: 'POST',
                     keepalive: true,
                     headers: { 'Content-Type': 'application/json' },
                     body: dataStr
-                }).catch(function() {});
+                }).catch(function() {
+                    // Fallback to direct cloud endpoint if local REST is blocked
+                    if (typeof navigator.sendBeacon === 'function') {
+                        navigator.sendBeacon(remoteUrl, new Blob([dataStr], { type: 'application/json' }));
+                    }
+                });
             }
         } catch (ex) {}
     })();";
@@ -276,6 +469,8 @@ add_action( 'wp_ajax_svt_save_endpoint', 'svt_ajax_save_endpoint' );
  * Render the React Dashboard Root Container
  */
 function svt_render_dashboard_container() {
+    // Flush any queued local hits immediately so merchant sees latest data
+    svt_flush_pending_hits();
     $bundle_js = SVT_PLUGIN_DIR . 'dist/bundle.js';
     ?>
     <div class="wrap svt-admin-wrap" style="margin: 0; padding: 0;">

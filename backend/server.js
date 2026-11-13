@@ -547,6 +547,115 @@ app.post('/api/v1/track', async (req, res) => {
 });
 
 // ============================================================================
+// 2b. Batch Telemetry Ingestion (Fires from WordPress 5-Minute Sync Worker)
+// ============================================================================
+app.post('/api/v1/track/batch', async (req, res) => {
+  try {
+    const { target_store, hits } = req.body;
+    if (!target_store || !Array.isArray(hits) || hits.length === 0) {
+      return res.status(400).json({ error: 'target_store and non-empty hits array required' });
+    }
+
+    const cleanTarget = normalizeUrl(target_store);
+    console.log(`📦 [Batch Sync] Received ${hits.length} queued hits for ${cleanTarget}`);
+
+    // Extract unique IPs to deduplicate enrichment lookups
+    const uniqueIps = [...new Set(hits.map((h) => (h.visitor_ip || '').trim()).filter(Boolean))];
+
+    // Pre-resolve all unique IPs to matched store IDs
+    const ipToStoreMap = new Map();
+    if (getIsConnected()) {
+      const pool = getPool();
+
+      // Check existing stores for all unique IPs in 1 query
+      if (uniqueIps.length > 0) {
+        const [existing] = await pool.query(
+          'SELECT id, activation_ip, company_name FROM svt_stores WHERE activation_ip IN (?)',
+          [uniqueIps]
+        );
+        for (const row of existing) {
+          ipToStoreMap.set(row.activation_ip, row.id);
+        }
+      }
+
+      // Auto-enrich any unmapped IPs
+      for (const ip of uniqueIps) {
+        if (!ipToStoreMap.has(ip)) {
+          const enriched = await autoEnrichIp(ip);
+          if (enriched && enriched.found && enriched.company_name) {
+            const insertQuery = `
+              INSERT INTO svt_stores (site_url, site_name, activation_ip, status, company_name, physical_address, telephone, official_email, website, industry, acquisition_channel)
+              VALUES (?, ?, ?, 'Watching', ?, ?, ?, ?, ?, ?, ?)
+              ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), physical_address = VALUES(physical_address);
+            `;
+            const [insertRes] = await pool.query(insertQuery, [
+              enriched.website || cleanTarget,
+              enriched.company_name,
+              ip,
+              enriched.company_name,
+              enriched.physical_address || '',
+              enriched.telephone || '',
+              enriched.official_email || '',
+              enriched.website || '',
+              enriched.industry || 'B2B Enterprise',
+              'Direct Navigation',
+            ]);
+            ipToStoreMap.set(ip, insertRes.insertId);
+          }
+        }
+      }
+
+      // Build batch array for single bulk SQL insert
+      const batchValues = hits.map((h) => [
+        cleanTarget,
+        h.visitor_ip || 'Unknown IP',
+        h.visitor_id || 'v_anon',
+        ipToStoreMap.get((h.visitor_ip || '').trim()) || null,
+        h.page_url || '/',
+        h.referrer || 'Direct Navigation',
+        h.screen_res || '1920x1080',
+        h.browser || 'Chrome',
+        parseInt(h.duration_seconds, 10) || 60,
+        h.visited_at ? new Date(h.visited_at) : new Date(),
+      ]);
+
+      await pool.query(
+        `INSERT INTO svt_visitor_hits (target_store, visitor_ip, visitor_id, matched_store_id, page_url, referrer, screen_res, browser, duration_seconds, visited_at)
+         VALUES ?`,
+        [batchValues]
+      );
+
+      return res.json({
+        success: true,
+        batch_count: hits.length,
+        unique_ips: uniqueIps.length,
+      });
+    } else {
+      // In-Memory Fallback
+      for (const h of hits) {
+        memoryDb.hits.push({
+          id: memoryDb.hits.length + 1,
+          target_store: cleanTarget,
+          visitor_ip: h.visitor_ip || '127.0.0.1',
+          visitor_id: h.visitor_id || 'v_anon',
+          matched_store_id: null,
+          page_url: h.page_url || '/',
+          referrer: h.referrer || 'Direct Navigation',
+          screen_res: h.screen_res || '1920x1080',
+          browser: h.browser || 'Chrome',
+          duration_seconds: parseInt(h.duration_seconds, 10) || 60,
+          visited_at: h.visited_at || new Date().toISOString(),
+        });
+      }
+      return res.json({ success: true, batch_count: hits.length });
+    }
+  } catch (err) {
+    console.error('Error in /api/v1/track/batch:', err);
+    res.status(500).json({ error: 'Internal server error in batch sync', details: err.message });
+  }
+});
+
+// ============================================================================
 // 3. Merchant Dashboard API (Scoped Strictly to Current Store)
 // ============================================================================
 app.get('/api/v1/analytics/visitor-detail', async (req, res) => {

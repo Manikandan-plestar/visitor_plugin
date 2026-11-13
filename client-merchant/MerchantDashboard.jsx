@@ -239,6 +239,16 @@ export default function MerchantDashboard() {
     setLoading(true);
     setErrorMsg(null);
     try {
+      // Flush any locally queued hits immediately so latest telemetry appears
+      if (wpSettings.ajaxUrl && wpSettings.nonce) {
+        try {
+          const form = new FormData();
+          form.append('action', 'svt_flush_batch');
+          form.append('nonce', wpSettings.nonce);
+          await fetch(wpSettings.ajaxUrl, { method: 'POST', body: form });
+        } catch (e) {}
+      }
+
       const url = `${wpSettings.apiUrl}/api/v1/analytics/visitor-detail?storeUrl=${encodeURIComponent(
         wpSettings.storeUrl
       )}`;
