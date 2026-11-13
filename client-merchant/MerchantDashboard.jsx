@@ -33,7 +33,140 @@ import {
   Users,
   Info,
   Wifi,
+  Trash2,
 } from 'lucide-react';
+
+// Educational Sample Demo Data (Displayed initially so new users can visualize intelligence)
+const DEFAULT_DEMO_COMPANIES = [
+  {
+    id: 'demo_siemens',
+    is_demo: true,
+    company_name: 'Siemens Energy AG',
+    activation_ip: '194.138.37.10',
+    status: 'watching',
+    physical_address: 'Otto-Hahn-Ring 6, 81739 Munich, Germany',
+    telephone: '+49 89 636 00',
+    official_email: 'contact@siemens-energy.com',
+    website: 'https://siemens-energy.com',
+    linkedin_url: 'https://linkedin.com/company/siemens-energy',
+    twitter_url: 'https://twitter.com/siemens_energy',
+    industry: 'Renewable Energy & Power Engineering',
+    acquisition_channel: 'Google Organic Search',
+    is_partner_store: 1,
+    total_visits: 3,
+    total_page_views: 4,
+    total_dwell_seconds: 780,
+    hits: [
+      {
+        id: 'demo_hit_1',
+        visitor_ip: '194.138.37.10',
+        page_url: '/product/industrial-turbine-sensor',
+        referrer: 'https://www.google.com/search?q=industrial+sensors',
+        screen_res: '1920x1080',
+        browser: 'Chrome 122',
+        duration_seconds: 420,
+        visited_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+      },
+      {
+        id: 'demo_hit_2',
+        visitor_ip: '194.138.37.10',
+        page_url: '/pricing',
+        referrer: 'Direct Navigation',
+        screen_res: '1920x1080',
+        browser: 'Chrome 122',
+        duration_seconds: 185,
+        visited_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+      },
+      {
+        id: 'demo_hit_3',
+        visitor_ip: '194.138.37.10',
+        page_url: '/solutions/grid-technologies',
+        referrer: 'https://www.google.com/',
+        screen_res: '1920x1080',
+        browser: 'Chrome 122',
+        duration_seconds: 175,
+        visited_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+      },
+    ],
+  },
+  {
+    id: 'demo_vodafone',
+    is_demo: true,
+    company_name: 'Vodafone Business Group',
+    activation_ip: '212.183.128.50',
+    status: 'company',
+    physical_address: 'Vodafone House, The Connection, Newbury RG14 2FN, UK',
+    telephone: '+44 1635 33251',
+    official_email: 'enterprise-sales@vodafone.com',
+    website: 'https://vodafone.com',
+    linkedin_url: 'https://linkedin.com/company/vodafone',
+    twitter_url: 'https://twitter.com/vodafonegroup',
+    industry: 'Telecommunications & 5G Infrastructure',
+    acquisition_channel: 'LinkedIn Campaign',
+    is_partner_store: 0,
+    total_visits: 2,
+    total_page_views: 2,
+    total_dwell_seconds: 330,
+    hits: [
+      {
+        id: 'demo_hit_4',
+        visitor_ip: '212.183.128.50',
+        page_url: '/solutions/5g-iot-gateway',
+        referrer: 'https://linkedin.com/feed',
+        screen_res: '1440x900',
+        browser: 'Safari 17',
+        duration_seconds: 240,
+        visited_at: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
+      },
+      {
+        id: 'demo_hit_5',
+        visitor_ip: '212.183.128.50',
+        page_url: '/contact-sales',
+        referrer: 'https://linkedin.com/feed',
+        screen_res: '1440x900',
+        browser: 'Safari 17',
+        duration_seconds: 90,
+        visited_at: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+      },
+    ],
+  },
+];
+
+const DEFAULT_DEMO_GENERAL_VISITORS = [
+  {
+    id: 'demo_gen_1',
+    is_demo: true,
+    visitor_ip: '98.142.204.11',
+    page_url: '/shop/smart-sensor',
+    referrer: 'https://www.google.com/search?q=smart+sensor+store',
+    screen_res: '1920x1080',
+    browser: 'Chrome 122',
+    duration_seconds: 140,
+    visited_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+  },
+  {
+    id: 'demo_gen_2',
+    is_demo: true,
+    visitor_ip: '98.142.204.11',
+    page_url: '/cart',
+    referrer: 'Direct Navigation',
+    screen_res: '1920x1080',
+    browser: 'Chrome 122',
+    duration_seconds: 85,
+    visited_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+  },
+  {
+    id: 'demo_gen_3',
+    is_demo: true,
+    visitor_ip: '157.240.241.35',
+    page_url: '/blog/b2b-analytics-guide',
+    referrer: 'https://facebook.com',
+    screen_res: '390x844',
+    browser: 'Mobile Safari',
+    duration_seconds: 210,
+    visited_at: new Date(Date.now() - 1000 * 60 * 80).toISOString(),
+  },
+];
 
 export default function MerchantDashboard() {
   const wpSettings = window.svtSettings || {
@@ -48,7 +181,7 @@ export default function MerchantDashboard() {
     nonce: '',
   };
 
-  // State: Direct MySQL Database Live Data (Zero Dummy Data)
+  // State: Direct MySQL Database Live Data
   const [liveCompanies, setLiveCompanies] = useState([]);
   const [generalVisitors, setGeneralVisitors] = useState([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
@@ -56,6 +189,50 @@ export default function MerchantDashboard() {
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'GENERAL'
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Demo IP Management State (Persisted in localStorage so merchants can delete demo items)
+  const [deletedDemoIps, setDeletedDemoIps] = useState(() => {
+    try {
+      const saved = localStorage.getItem('amazer_deleted_demo_ips');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [allDemoDismissed, setAllDemoDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('amazer_demo_dismissed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleDeleteDemoIp = (ip, id) => {
+    setDeletedDemoIps((prev) => {
+      const next = [...new Set([...prev, ip, String(id)])];
+      try {
+        localStorage.setItem('amazer_deleted_demo_ips', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleDeleteAllDemo = () => {
+    setAllDemoDismissed(true);
+    try {
+      localStorage.setItem('amazer_demo_dismissed', 'true');
+    } catch (e) {}
+  };
+
+  const handleRestoreDemo = () => {
+    setAllDemoDismissed(false);
+    setDeletedDemoIps([]);
+    try {
+      localStorage.removeItem('amazer_demo_dismissed');
+      localStorage.removeItem('amazer_deleted_demo_ips');
+    } catch (e) {}
+  };
 
   // Fetch Live Analytics Data from Central Express Node Backend (Connected to MySQL)
   const fetchLiveAnalytics = async () => {
@@ -91,10 +268,43 @@ export default function MerchantDashboard() {
     fetchLiveAnalytics();
   }, []);
 
-  // Active Company List directly from MySQL DB
+  // Filtered Demo Data (Excludes individually deleted demo records)
+  const visibleDemoCompanies = useMemo(() => {
+    if (allDemoDismissed) return [];
+    return DEFAULT_DEMO_COMPANIES.filter(
+      (c) => !deletedDemoIps.includes(c.activation_ip) && !deletedDemoIps.includes(String(c.id))
+    );
+  }, [allDemoDismissed, deletedDemoIps]);
+
+  const visibleDemoGeneralVisitors = useMemo(() => {
+    if (allDemoDismissed) return [];
+    return DEFAULT_DEMO_GENERAL_VISITORS.filter(
+      (v) => !deletedDemoIps.includes(v.visitor_ip) && !deletedDemoIps.includes(String(v.id))
+    );
+  }, [allDemoDismissed, deletedDemoIps]);
+
+  // Combined Data: Live Database records merged with Demo records if active
+  const combinedCompanies = useMemo(() => {
+    if (liveCompanies.length > 0) {
+      return [...liveCompanies, ...visibleDemoCompanies];
+    }
+    return visibleDemoCompanies;
+  }, [liveCompanies, visibleDemoCompanies]);
+
+  const combinedGeneralVisitors = useMemo(() => {
+    if (generalVisitors.length > 0) {
+      return [...generalVisitors, ...visibleDemoGeneralVisitors];
+    }
+    return visibleDemoGeneralVisitors;
+  }, [generalVisitors, visibleDemoGeneralVisitors]);
+
+  const isShowingDemo = visibleDemoCompanies.length > 0 || visibleDemoGeneralVisitors.length > 0;
+
+  // Active Company List
   const companies = useMemo(() => {
-    return liveCompanies.map((c) => ({
+    return combinedCompanies.map((c) => ({
       id: c.id,
+      is_demo: Boolean(c.is_demo),
       company_name: c.company_name || 'Unidentified Company',
       activation_ip: c.activation_ip || c.hits?.[0]?.visitor_ip || 'Corporate Subnet',
       initials: (c.company_name || 'UC')
@@ -139,7 +349,7 @@ export default function MerchantDashboard() {
         is_single_page: !h.duration_seconds || h.duration_seconds < 40,
       })),
     }));
-  }, [liveCompanies]);
+  }, [combinedCompanies]);
 
   // Selected Company
   const selectedCompany = useMemo(() => {
@@ -148,13 +358,14 @@ export default function MerchantDashboard() {
 
   // Group General Consumer Visitors by IP and sort by Highest Hits first
   const groupedGeneralVisitors = useMemo(() => {
-    if (!generalVisitors || generalVisitors.length === 0) return [];
+    if (!combinedGeneralVisitors || combinedGeneralVisitors.length === 0) return [];
     const map = new Map();
-    generalVisitors.forEach((hit) => {
+    combinedGeneralVisitors.forEach((hit) => {
       const ip = hit.visitor_ip || 'Unknown IP';
       if (!map.has(ip)) {
         map.set(ip, {
           ip,
+          is_demo: Boolean(hit.is_demo),
           total_hits: 0,
           total_dwell_seconds: 0,
           browser: hit.browser || 'Chrome',
@@ -185,7 +396,7 @@ export default function MerchantDashboard() {
     });
 
     return list;
-  }, [generalVisitors]);
+  }, [combinedGeneralVisitors]);
 
   // Active General Visitor (defaults to #1 Highest Hit IP)
   const activeGeneralVisitor = useMemo(() => {
@@ -237,6 +448,37 @@ export default function MerchantDashboard() {
         </div>
       )}
 
+      {/* Interactive Demo Mode Notice Banner */}
+      {isShowingDemo && (
+        <div className="mb-3.5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/90 to-purple-50/90 border border-blue-200/80 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900">Demo Mode Active</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                  Data Preview
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Displaying sample B2B companies & consumer visits so you can explore how real-time intelligence visualizes. You can delete demo records anytime.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleDeleteAllDemo}
+            className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-red-50 text-red-600 border border-red-200 shadow-2xs transition-all flex items-center gap-1.5 shrink-0"
+            title="Delete all demo data and show only real visitors"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+            <span>Delete Demo Data</span>
+          </button>
+        </div>
+      )}
+
       {/* 2 Primary Modes & Company Selector Dropdown */}
       <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm mb-3.5">
         <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -269,7 +511,7 @@ export default function MerchantDashboard() {
           </button>
 
           {/* Placed immediately after General Visitors Tab */}
-          {activeFilter === 'ALL' && (
+          {activeFilter === 'ALL' && companies.length > 0 && (
             <div className="flex items-center gap-2.5 sm:ml-2 sm:pl-4 sm:border-l border-slate-200">
               <label htmlFor="company-dropdown" className="text-xs font-bold text-slate-500 whitespace-nowrap flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-blue-600" />
@@ -287,7 +529,8 @@ export default function MerchantDashboard() {
                 >
                   {companies.map((c) => {
                     let badge = '';
-                    if (c.is_partner_store) badge = ' 🌐 [Partner Store]';
+                    if (c.is_demo) badge = ' 💡 [Demo Sample]';
+                    else if (c.is_partner_store) badge = ' 🌐 [Partner Store]';
                     else if ((c.status || '').toLowerCase() === 'watching') badge = ' ⭐ [Watching]';
                     return (
                       <option key={c.id} value={c.id}>
@@ -324,47 +567,47 @@ export default function MerchantDashboard() {
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                   <Eye className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    Corporate Page Views
+                    Corporate Page Hits
                   </span>
                   <span className="text-xl font-black text-slate-900 font-mono">
-                    {companies.reduce((sum, c) => sum + (c.total_page_views || c.page_visits?.length || 0), 0)}
+                    {companies.reduce((acc, c) => acc + (c.total_page_views || c.page_visits?.length || 1), 0)}
                   </span>
                 </div>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    Avg Corporate Dwell
+                    Total Corporate Dwell
                   </span>
                   <span className="text-xl font-black text-slate-900 font-mono">
-                    {companies.length > 0
-                      ? formatDuration(
-                          Math.round(
-                            companies.reduce((sum, c) => sum + (c.total_dwell_seconds || 180), 0) /
-                              companies.length
-                          )
-                        )
-                      : '02:30:00'}
+                    {formatDuration(
+                      companies.reduce(
+                        (acc, c) =>
+                          acc +
+                          (c.page_visits?.reduce((hAcc, h) => hAcc + (parseInt(h.duration) || 60), 0) || 120),
+                        0
+                      )
+                    )}
                   </span>
                 </div>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                  <Flame className="w-5 h-5" />
+                  <Zap className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    High-Intent Accounts
+                    High Intent Leads
                   </span>
                   <span className="text-xl font-black text-slate-900 font-mono">
                     {companies.filter((c) => c.status === 'watching' || c.is_partner_store || (c.page_visits && c.page_visits.length > 1)).length}
@@ -400,6 +643,12 @@ export default function MerchantDashboard() {
 
                     {/* Status Badges - Placed on the same row */}
                     <div className="flex items-center gap-1.5 mt-3.5 flex-nowrap overflow-x-auto">
+                      {selectedCompany.is_demo && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs shrink-0 whitespace-nowrap">
+                          <Sparkles className="w-3 h-3 text-amber-600" />
+                          Demo Sample
+                        </span>
+                      )}
                       {selectedCompany.status === 'watching' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs shrink-0 whitespace-nowrap">
                           <Eye className="w-3 h-3 text-amber-600" />
@@ -415,6 +664,17 @@ export default function MerchantDashboard() {
                           <Globe className="w-3 h-3 text-emerald-600" />
                           Network Partner Store
                         </span>
+                      )}
+                      {selectedCompany.is_demo && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDemoIp(selectedCompany.activation_ip, selectedCompany.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 shadow-2xs shrink-0 whitespace-nowrap transition-all ml-auto"
+                          title="Delete this demo IP"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-500" />
+                          <span>Delete Demo IP</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -448,28 +708,9 @@ export default function MerchantDashboard() {
                           <Phone className="w-3.5 h-3.5 text-slate-400" />
                           Telephone
                         </span>
-                        <a
-                          href={`tel:${selectedCompany.telephone}`}
-                          className="font-mono font-semibold text-slate-800 hover:text-blue-600"
-                        >
+                        <span className="font-mono font-semibold text-slate-700">
                           {selectedCompany.telephone}
-                        </a>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-slate-400" />
-                          Website
                         </span>
-                        <a
-                          href={selectedCompany.website}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono font-semibold text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          {selectedCompany.website.replace(/^https?:\/\//, '')}
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
@@ -477,183 +718,196 @@ export default function MerchantDashboard() {
                           <Mail className="w-3.5 h-3.5 text-slate-400" />
                           Official Email
                         </span>
-                        <a
-                          href={`mailto:${selectedCompany.official_email}`}
-                          className="font-mono font-semibold text-slate-800 hover:text-blue-600 truncate max-w-[180px]"
-                        >
-                          {selectedCompany.official_email}
-                        </a>
+                        {selectedCompany.official_email !== '--' ? (
+                          <a
+                            href={`mailto:${selectedCompany.official_email}`}
+                            className="font-medium text-blue-600 hover:underline max-w-[200px] truncate"
+                          >
+                            {selectedCompany.official_email}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">--</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 flex items-center gap-1.5">
+                          <Globe className="w-3.5 h-3.5 text-slate-400" />
+                          Corporate Domain
+                        </span>
+                        {selectedCompany.website !== '#' ? (
+                          <a
+                            href={selectedCompany.website}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            {selectedCompany.website.replace(/^https?:\/\//, '')}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">--</span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Traffic Acquisition Badge */}
+                    {/* Social Media Links */}
                     <div className="pt-2 border-t border-slate-100/80">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                        Traffic Acquisition Channel
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                        Social Verification
                       </span>
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
-                        <Compass className="w-3.5 h-3.5 text-blue-500" />
-                        <span>{selectedCompany.acquisition_channel}</span>
-                      </div>
-                    </div>
-                  </div>
+                      <div className="flex items-center gap-2">
+                        {selectedCompany.linkedin_url ? (
+                          <a
+                            href={selectedCompany.linkedin_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center gap-1.5 transition-colors border border-blue-200/60"
+                          >
+                            <span>LinkedIn Profile</span>
+                            <ArrowUpRight className="w-3 h-3" />
+                          </a>
+                        ) : null}
 
-                  {/* Bottom 3 Summary Stats (Whoisvisiting Metric Bar) */}
-                  <div className="grid grid-cols-3 bg-slate-50 divide-x divide-slate-200 border-t border-slate-100 text-center py-4 shrink-0">
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Time On Site
-                      </div>
-                      <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono mt-0.5">
-                        {selectedCompany.time_on_site}
+                        {selectedCompany.twitter_url ? (
+                          <a
+                            href={selectedCompany.twitter_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 flex items-center gap-1.5 transition-colors border border-sky-200/60"
+                          >
+                            <span>X / Twitter</span>
+                            <ArrowUpRight className="w-3 h-3" />
+                          </a>
+                        ) : null}
+
+                        {!selectedCompany.linkedin_url && !selectedCompany.twitter_url && (
+                          <span className="text-xs text-slate-400 italic">No social profiles attached</span>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Total Visits
-                      </div>
-                      <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono mt-0.5">
-                        {selectedCompany.total_visits}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Page Views
-                      </div>
-                      <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono mt-0.5">
-                        {selectedCompany.total_page_views}
+
+                    {/* Traffic Source & Intent */}
+                    <div className="pt-2 border-t border-slate-100/80">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                        Acquisition Channel
+                      </span>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-700 font-semibold flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5 text-blue-500" />
+                          {selectedCompany.acquisition_channel}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 font-mono">
+                          {selectedCompany.acquisition_badge}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-            {/* =================================================================== */}
-            {/* RIGHT COLUMN: PAGE VISITS TABLE (SAME ROW, EQUAL HEIGHT)            */}
-            {/* =================================================================== */}
-            <div className="flex-1 min-w-[540px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                <div>
-                  <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                    Page Visits History
-                    <span className="text-xs font-mono px-2 py-0.5 bg-slate-100 rounded-md text-slate-600">
-                      {selectedCompany?.page_visits?.length || 0} Records
+              {/* =================================================================== */}
+              {/* RIGHT COLUMN: RECENT PAGE VISITS (Fixed Height & Inner Scroll)      */}
+              {/* =================================================================== */}
+              <div className="flex-1 min-w-[540px] h-[520px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base">
+                      Browsing Journey & Page Hits
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Pages visited by employees from <strong className="text-slate-800">{selectedCompany.company_name}</strong>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>{selectedCompany.page_visits?.length || 0} Total Page Hits</span>
                     </span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Exact pages browsed by staff and visitors from {selectedCompany?.company_name}
-                  </p>
+                    <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{selectedCompany.time_on_site} Total Dwell</span>
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-400 font-mono">
-                    Reverse-IP Verified
-                  </span>
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                </div>
-              </div>
-
-              {/* Visits Table: Inner Scrollable */}
-              <div className="flex-1 overflow-y-auto overflow-x-auto svt-custom-scrollbar">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
-                    <tr className="bg-slate-50 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                      <th className="py-3 px-4 bg-slate-50">Status</th>
-                      <th className="py-3 px-4 bg-slate-50">Date / Time</th>
-                      <th className="py-3 px-4 bg-slate-50">Duration</th>
-                      <th className="py-3 px-4 bg-slate-50">Page URL</th>
-                      <th className="py-3 px-4 bg-slate-50">Browser & Device</th>
-                      <th className="py-3 px-4 bg-slate-50">Referral Source</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {selectedCompany?.page_visits?.map((hit) => (
-                      <tr key={hit.id} className="hover:bg-blue-50/30 transition-colors border-b border-slate-200">
-                        {/* Status Icon */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600">
-                            <Check className="w-3.5 h-3.5" />
-                          </span>
-                        </td>
-
-                        {/* Date / Time */}
-                        <td className="py-3.5 px-4 font-mono text-slate-600 whitespace-nowrap">
-                          {hit.date_time}
-                        </td>
-
-                        {/* Duration */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {hit.is_single_page ? (
-                            <span className="text-slate-400 italic text-[11px]">
-                              Single page visit
-                            </span>
-                          ) : (
-                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                              {hit.duration}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Page URL Link */}
-                        <td className="py-3.5 px-4 font-mono font-semibold text-blue-600 max-w-[280px]">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <a href={hit.page_url} target="_blank" rel="noreferrer" title={hit.page_url} className="hover:underline truncate max-w-[190px]">
-                              {hit.page_url}
-                            </a>
-                            {(hit.page_url?.includes('plan') || hit.page_url?.includes('pricing') || hit.page_url?.includes('product') || hit.page_url?.includes('contact') || hit.page_url?.includes('checkout')) && (
-                              <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 flex items-center gap-0.5 shrink-0" title="High-Intent Commercial Page View">
-                                <Flame className="w-2.5 h-2.5 text-amber-600" />
-                                High Intent
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Browser & Device Icon */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5 text-slate-700">
-                            <Monitor className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="font-medium">{hit.browser}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              ({hit.screen_res})
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Referral Source */}
-                        <td className="py-3.5 px-4 text-slate-500 max-w-[180px] truncate text-[11px]">
-                          {hit.referrer.startsWith('http') ? (
-                            <a
-                              href={hit.referrer}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:underline text-slate-600"
-                            >
-                              {hit.referrer.replace(/^https?:\/\//, '')}
-                            </a>
-                          ) : (
-                            <span>{hit.referrer}</span>
-                          )}
-                        </td>
+                {/* Inner Scrollable Table */}
+                <div className="flex-1 overflow-y-auto overflow-x-auto svt-custom-scrollbar">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
+                      <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-200">
+                        <th className="py-3 px-4 bg-slate-50">Status</th>
+                        <th className="py-3 px-4 bg-slate-50">Date & Time</th>
+                        <th className="py-3 px-4 bg-slate-50">Dwell Time</th>
+                        <th className="py-3 px-4 bg-slate-50">Page Visited</th>
+                        <th className="py-3 px-4 bg-slate-50">Device & Screen</th>
+                        <th className="py-3 px-4 bg-slate-50">Referrer</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {(selectedCompany.page_visits || []).map((hit, idx) => (
+                        <tr key={hit.id || idx} className="hover:bg-slate-50/80 transition-colors border-b border-slate-200">
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Active Hit
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-slate-600 whitespace-nowrap">
+                            {hit.date_time}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
+                            {hit.duration}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono text-blue-700 font-semibold max-w-[220px] truncate block" title={hit.page_url}>
+                              {hit.page_url}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                            <div className="font-semibold text-slate-800">{hit.browser}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{hit.screen_res}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 text-[11px] max-w-[180px] truncate" title={hit.referrer}>
+                            {hit.referrer && hit.referrer.startsWith('http') ? (
+                              <a
+                                href={hit.referrer}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:underline text-slate-600"
+                              >
+                                {hit.referrer.replace(/^https?:\/\//, '')}
+                              </a>
+                            ) : (
+                              <span>{hit.referrer}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+            <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-800">No Identified Companies Yet</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              When corporate visitors browse your store, their company details and page visits will appear here automatically in real time.
+            </p>
+            <button
+              type="button"
+              onClick={handleRestoreDemo}
+              className="mt-4 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all inline-flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+              <span>Preview Sample Demo Data</span>
+            </button>
+          </div>
+        )
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-          <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800">No Identified Companies Yet</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            When corporate visitors browse your store, their company details and page visits will appear here automatically in real time.
-          </p>
-        </div>
-      )
-    ) : (
         /* =================================================================== */
         /* GENERAL & RESIDENTIAL CONSUMER TRAFFIC VIEW                         */
         /* =================================================================== */
@@ -683,7 +937,7 @@ export default function MerchantDashboard() {
                   Total Page Views
                 </span>
                 <span className="text-xl font-black text-slate-900 font-mono">
-                  {generalVisitors.length}
+                  {combinedGeneralVisitors.length}
                 </span>
               </div>
             </div>
@@ -700,7 +954,7 @@ export default function MerchantDashboard() {
                   {formatDuration(
                     groupedGeneralVisitors.length > 0
                       ? Math.round(
-                          generalVisitors.reduce((acc, h) => acc + (h.duration_seconds || 60), 0) /
+                          combinedGeneralVisitors.reduce((acc, h) => acc + (h.duration_seconds || 60), 0) /
                             groupedGeneralVisitors.length
                         )
                       : 120
@@ -731,6 +985,14 @@ export default function MerchantDashboard() {
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                 Non-corporate consumer traffic from residential broadband and mobile networks will be listed here.
               </p>
+              <button
+                type="button"
+                onClick={handleRestoreDemo}
+                className="mt-4 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all inline-flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Preview Sample Demo Visitors</span>
+              </button>
             </div>
           ) : (
             <div className="flex flex-row gap-6 items-stretch w-full overflow-x-auto pb-4">
@@ -738,15 +1000,15 @@ export default function MerchantDashboard() {
               <div className="w-[380px] lg:w-[420px] shrink-0 h-[460px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
                   <div>
-                    <h3 className="font-black text-slate-900 text-sm">Ranked Consumer Visitors</h3>
-                    <p className="text-[11px] text-slate-500">Highest hits shown first • Click to inspect</p>
+                    <h3 className="font-bold text-slate-900 text-sm">Consumer Visitor IP Feeds</h3>
+                    <p className="text-[11px] text-slate-500">Ranked by highest hit frequency</p>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 font-mono">
-                    {groupedGeneralVisitors.length} Visitors
+                  <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {groupedGeneralVisitors.length} Unique IPs
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto divide-y divide-slate-200 svt-custom-scrollbar">
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 svt-custom-scrollbar">
                   {groupedGeneralVisitors.map((visitor, index) => {
                     const isSelected = activeGeneralVisitor && activeGeneralVisitor.ip === visitor.ip;
                     const isTopHit = index === 0;
@@ -763,6 +1025,11 @@ export default function MerchantDashboard() {
                       >
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-1.5">
+                            {visitor.is_demo && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                DEMO
+                              </span>
+                            )}
                             {isTopHit ? (
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-400 text-amber-950 flex items-center gap-1 shadow-2xs">
                                 <Flame className="w-3 h-3 fill-amber-950" />
@@ -826,7 +1093,24 @@ export default function MerchantDashboard() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {activeGeneralVisitor.is_demo && (
+                        <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1.5 rounded-xl border border-amber-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Demo Visitor</span>
+                        </span>
+                      )}
+                      {activeGeneralVisitor.is_demo && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDemoIp(activeGeneralVisitor.ip, activeGeneralVisitor.ip)}
+                          className="text-xs font-bold bg-white hover:bg-red-50 text-red-600 px-3 py-1.5 rounded-xl border border-red-200 shadow-2xs transition-all flex items-center gap-1.5"
+                          title="Delete this demo visitor IP"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          <span>Delete Demo IP</span>
+                        </button>
+                      )}
                       <span className="text-xs font-mono font-bold bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1.5">
                         <Eye className="w-3.5 h-3.5" />
                         <span>{activeGeneralVisitor.total_hits} Total Hits</span>
@@ -858,25 +1142,25 @@ export default function MerchantDashboard() {
                             <tr key={hit.id || i} className="hover:bg-slate-50/80 transition-colors border-b border-slate-200">
                               <td className="py-3.5 px-4">
                                 {isHighIntent ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
                                     <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                    High Intent
+                                    High Engagement
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    Active Hit
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    <Clock className="w-3 h-3 text-slate-400" />
+                                    Standard Browsing
                                   </span>
                                 )}
                               </td>
                               <td className="py-3.5 px-4 font-mono text-slate-600 whitespace-nowrap">
                                 {formatHitTime(hit.visited_at)}
                               </td>
-                              <td className="py-3.5 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
+                              <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
                                 {formatDuration(hit.duration_seconds || 60)}
                               </td>
                               <td className="py-3.5 px-4">
-                                <span className="font-mono text-blue-600 font-semibold max-w-[220px] truncate block hover:underline cursor-pointer" title={hit.page_url}>
+                                <span className="font-mono text-indigo-700 font-semibold max-w-[200px] truncate block" title={hit.page_url}>
                                   {hit.page_url || '/'}
                                 </span>
                               </td>
