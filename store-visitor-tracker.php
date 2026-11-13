@@ -126,29 +126,6 @@ function svt_deactivate_batch_cron() {
 register_deactivation_hook( __FILE__, 'svt_deactivate_batch_cron' );
 
 /**
- * Helper: Retrieve local logs directory path
- */
-function svt_get_log_dir() {
-    $upload_dir = wp_upload_dir();
-    $log_dir = trailingslashit( $upload_dir['basedir'] ) . 'svt-logs';
-
-    if ( ! file_exists( $log_dir ) ) {
-        wp_mkdir_p( $log_dir );
-        @file_put_contents( $log_dir . '/index.php', '<?php // Silence is golden.' );
-        @file_put_contents( $log_dir . '/.htaccess', 'Deny from all' );
-    }
-
-    return $log_dir;
-}
-
-/**
- * Helper: Retrieve local pending hits log file path
- */
-function svt_get_pending_hits_file() {
-    return trailingslashit( svt_get_log_dir() ) . 'pending-hits.log';
-}
-
-/**
  * Register Local REST API Endpoint for Instant Local Hit Logging
  */
 function svt_register_local_logging_route() {
@@ -161,7 +138,7 @@ function svt_register_local_logging_route() {
 add_action( 'rest_api_init', 'svt_register_local_logging_route' );
 
 /**
- * Handle incoming storefront hit: saves to local log with zero external network calls
+ * Handle incoming storefront hit: queues to local WordPress database buffer with zero external network calls
  */
 function svt_handle_local_hit_log( $request ) {
     $client_ip = '';
@@ -190,48 +167,30 @@ function svt_handle_local_hit_log( $request ) {
         'visited_at'       => isset( $params['timestamp'] ) ? sanitize_text_field( $params['timestamp'] ) : gmdate( 'Y-m-d\TH:i:s\Z' ),
     );
 
-    $log_file = svt_get_pending_hits_file();
-    @file_put_contents( $log_file, wp_json_encode( $hit_record ) . "\n", FILE_APPEND | LOCK_EX );
+    $queue = get_option( 'svt_pending_hits', array() );
+    if ( ! is_array( $queue ) ) {
+        $queue = array();
+    }
+
+    if ( count( $queue ) < 1000 ) {
+        $queue[] = $hit_record;
+        update_option( 'svt_pending_hits', $queue, false );
+    }
 
     return new WP_REST_Response( array( 'logged' => true ), 200 );
 }
 
 /**
- * Core Flush Routine: Reads pending local log file and pushes bulk batch to central server
+ * Core Flush Routine: Reads pending local queue and pushes bulk batch to central server
  */
 function svt_flush_pending_hits() {
-    $log_file = svt_get_pending_hits_file();
-    if ( ! file_exists( $log_file ) || filesize( $log_file ) === 0 ) {
+    $hits = get_option( 'svt_pending_hits', array() );
+    if ( empty( $hits ) || ! is_array( $hits ) ) {
         return 0;
     }
 
-    // Atomic rename so new incoming hits continue logging to a fresh file smoothly
-    $sync_file = trailingslashit( svt_get_log_dir() ) . 'pending-hits-syncing-' . time() . '.log';
-    if ( ! @rename( $log_file, $sync_file ) ) {
-        return 0;
-    }
-
-    $content = @file_get_contents( $sync_file );
-    if ( empty( $content ) ) {
-        @unlink( $sync_file );
-        return 0;
-    }
-
-    $lines = explode( "\n", trim( $content ) );
-    $hits = array();
-    foreach ( $lines as $line ) {
-        $line = trim( $line );
-        if ( empty( $line ) ) continue;
-        $decoded = json_decode( $line, true );
-        if ( is_array( $decoded ) ) {
-            $hits[] = $decoded;
-        }
-    }
-
-    if ( empty( $hits ) ) {
-        @unlink( $sync_file );
-        return 0;
-    }
+    // Reset queue atomically so incoming hits start in a fresh batch
+    delete_option( 'svt_pending_hits' );
 
     $api_base = svt_get_api_url();
     $batch_endpoint = trailingslashit( $api_base ) . 'api/v1/track/batch';
@@ -250,12 +209,12 @@ function svt_flush_pending_hits() {
     ) );
 
     if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
-        @unlink( $sync_file );
         return count( $hits );
     } else {
-        // Network or server temporarily down; restore unsynced hits back into pending log
-        @file_put_contents( $log_file, $content, FILE_APPEND | LOCK_EX );
-        @unlink( $sync_file );
+        // Network or server temporarily down; safely restore unsynced hits back into queue
+        $existing = get_option( 'svt_pending_hits', array() );
+        $merged = is_array( $existing ) ? array_merge( $hits, $existing ) : $hits;
+        update_option( 'svt_pending_hits', array_slice( $merged, 0, 1000 ), false );
         return 0;
     }
 }
