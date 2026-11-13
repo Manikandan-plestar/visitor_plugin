@@ -356,7 +356,7 @@ export default function MerchantDashboard() {
     return companies.find((c) => String(c.id) === String(selectedCompanyId)) || companies[0] || null;
   }, [companies, selectedCompanyId]);
 
-  // Group General Consumer Visitors by IP and sort by Highest Hits first
+  // Group General Website Visitors by IP and sort by Highest Hits first
   const groupedGeneralVisitors = useMemo(() => {
     if (!combinedGeneralVisitors || combinedGeneralVisitors.length === 0) return [];
     const map = new Map();
@@ -415,7 +415,7 @@ export default function MerchantDashboard() {
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 svt-pulsing-dot"></span>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              Amazer Analytics(WHOIS Visitors)
+              Amazer Analytics(WHOIS)
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">
                 B2B Intelligence
               </span>
@@ -463,7 +463,7 @@ export default function MerchantDashboard() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-600 mt-0.5">
-                Displaying sample B2B companies & consumer visits so you can explore how real-time intelligence visualizes. You can delete demo records anytime.
+                Displaying sample B2B companies & website visits so you can explore how real-time intelligence visualizes. You can delete demo records anytime.
               </p>
             </div>
           </div>
@@ -909,7 +909,7 @@ export default function MerchantDashboard() {
         )
       ) : (
         /* =================================================================== */
-        /* GENERAL & RESIDENTIAL CONSUMER TRAFFIC VIEW                         */
+        /* GENERAL & RESIDENTIAL WEBSITE TRAFFIC VIEW                          */
         /* =================================================================== */
         <div className="space-y-6">
           {/* Top Summary Metrics: Total Visitors, Total Page Views, Avg Session, Repeat Engagement */}
@@ -920,7 +920,7 @@ export default function MerchantDashboard() {
               </div>
               <div className="min-w-0">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                  Total Consumer Visitors
+                  Total Website Visitors
                 </span>
                 <span className="text-xl font-black text-slate-900 font-mono">
                   {groupedGeneralVisitors.length}
@@ -969,7 +969,7 @@ export default function MerchantDashboard() {
               </div>
               <div className="min-w-0">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                  Repeat Consumer Hits
+                  Repeat Website Hits
                 </span>
                 <span className="text-xl font-black text-slate-900 font-mono">
                   {groupedGeneralVisitors.filter((v) => v.total_hits > 1).length}
@@ -983,7 +983,7 @@ export default function MerchantDashboard() {
               <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-base font-bold text-slate-800">No General Visitors Recorded Yet</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Non-corporate consumer traffic from residential broadband and mobile networks will be listed here.
+                Non-corporate website traffic from residential broadband and mobile networks will be listed here.
               </p>
               <button
                 type="button"
@@ -996,11 +996,11 @@ export default function MerchantDashboard() {
             </div>
           ) : (
             <div className="flex flex-row gap-6 items-stretch w-full overflow-x-auto pb-4">
-              {/* LEFT COLUMN: Ranked Consumer Visitors (Highest Hits First, Scrollable) */}
+              {/* LEFT COLUMN: Ranked Website Visitors (Highest Hits First, Scrollable) */}
               <div className="w-[380px] lg:w-[420px] shrink-0 h-[460px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Consumer Visitor IP Feeds</h3>
+                    <h3 className="font-bold text-slate-900 text-sm">Website Visitor IP Feeds</h3>
                     <p className="text-[11px] text-slate-500">Ranked by highest hit frequency</p>
                   </div>
                   <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
