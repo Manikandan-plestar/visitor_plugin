@@ -169,7 +169,7 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
 ];
 
 export default function MerchantDashboard() {
-  const wpSettings = window.svtSettings || {
+  const wpSettings = window.amazerWhoisSettings || window.svtSettings || {
     storeUrl: 'http://localhost/wordpress_practice',
     apiUrl:
       typeof window !== 'undefined' &&
@@ -1161,7 +1161,7 @@ export default function MerchantDashboard() {
                               </td>
                               <td className="py-3.5 px-4">
                                 <span className="font-mono text-indigo-700 font-semibold max-w-[200px] truncate block" title={hit.page_url}>
-                                  {hit.page_url || '/'}
+                                   {hit.page_url || '/'}
                                 </span>
                               </td>
                               <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
