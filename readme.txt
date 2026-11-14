@@ -1,5 +1,5 @@
 === Amazer Analytics (WHOIS) ===
-Contributors: amazerplugins
+Contributors: amazerinc, amazerplugins
 Tags: amazer analytics, whois analytics, visitor tracking, b2b intelligence, lead generation
 Requires at least: 5.8
 Tested up to: 7.1
