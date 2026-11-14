@@ -5,7 +5,7 @@ export default {
     "./staff-portal/**/*.{js,jsx,ts,tsx}",
     "./shared/**/*.{js,jsx,ts,tsx,css}",
   ],
-  important: ':is(#svt-dashboard-root, #svt-network-dashboard-root, #staff-root)',
+  important: ':is(#amazer-via-dashboard-root, #amazer-whois-dashboard-root, #svt-dashboard-root, #svt-network-dashboard-root, #staff-root)',
   corePlugins: {
     preflight: false,
   },

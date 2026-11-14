@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+#amazer-via-dashboard-root,
+#amazer-whois-dashboard-root,
 #svt-network-dashboard-root,
 #svt-dashboard-root,
 #staff-root {
@@ -12,6 +14,12 @@
   -webkit-font-smoothing: antialiased;
 }
 
+#amazer-via-dashboard-root *,
+#amazer-via-dashboard-root *::before,
+#amazer-via-dashboard-root *::after,
+#amazer-whois-dashboard-root *,
+#amazer-whois-dashboard-root *::before,
+#amazer-whois-dashboard-root *::after,
 #svt-network-dashboard-root *,
 #svt-network-dashboard-root *::before,
 #svt-network-dashboard-root *::after,

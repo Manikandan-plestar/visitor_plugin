@@ -176,7 +176,15 @@ add_action( 'admin_menu', 'amazer_via_register_admin_dashboard_menu' );
  * Enqueue Dashboard Assets on plugin page
  */
 function amazer_via_enqueue_admin_assets( $hook_suffix ) {
-    if ( strpos( (string) $hook_suffix, 'amazer-visitors-intelligence-analytics' ) === false ) {
+    $current_page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+    $is_plugin_screen = (
+        strpos( (string) $hook_suffix, 'amazer' ) !== false ||
+        strpos( (string) $hook_suffix, 'svt' ) !== false ||
+        strpos( $current_page, 'amazer' ) !== false ||
+        strpos( $current_page, 'svt' ) !== false
+    );
+
+    if ( ! $is_plugin_screen ) {
         return;
     }
 
@@ -189,7 +197,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'amazer-via-bundle-css',
             $bundle_css_url,
             array(),
-            filemtime( $bundle_css )
+            AMAZER_VIA_VERSION
         );
     }
 
@@ -198,7 +206,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'amazer-via-bundle-js',
             AMAZER_VIA_PLUGIN_URL . 'dist/bundle.js',
             array( 'wp-element' ),
-            filemtime( $bundle_js ),
+            AMAZER_VIA_VERSION,
             true
         );
 
