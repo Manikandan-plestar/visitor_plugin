@@ -28,6 +28,18 @@ This plugin relies on a 3rd-party SaaS API service to perform real-time reverse-
 * **Terms of Service**: https://plestar.net/amazer-analytics/terms.html
 * **Privacy Policy**: https://plestar.net/amazer-analytics/privacy.html
 
+== Source Code & Build Instructions ==
+
+The human-readable source code for the minified frontend bundle (dist/bundle.js) is publicly maintained and available in the following repository:
+* Repository URL: https://github.com/Manikandan-plestar/visitor_plugin
+
+To build or compile the JavaScript bundle from source:
+1. Clone the repository: `git clone https://github.com/Manikandan-plestar/visitor_plugin.git`
+2. Change into the plugin directory and install dependencies:
+   `npm install`
+3. Compile the production bundle:
+   `npm run build`
+
 == Installation ==
 
 1. Upload the plugin folder `amazer-whois-analytics` to `/wp-content/plugins/` directory, or upload the `.zip` archive via **Plugins > Add New > Upload Plugin**.
