@@ -1,6 +1,6 @@
-=== Amazer Analytics (WHOIS) ===
+=== Amazer VI Analytics ===
 Contributors: amazerinc, amazerplugins
-Tags: amazer analytics, whois analytics, visitor tracking, b2b intelligence, lead generation
+Tags: amazer analytics, visitor intelligence, whois analytics, visitor tracking, b2b intelligence
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -12,7 +12,7 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal v
 
 == Description ==
 
-**Amazer Analytics (WHOIS)** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
+**Amazer VI Analytics** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
 
 ### Key Capabilities:
 * **Real-Time Reverse-IP Intelligence**: Automatically identifies corporate visitor networks, company names, industry, and corporate headquarters.
@@ -42,10 +42,10 @@ To build or compile the JavaScript bundle from source:
 
 == Installation ==
 
-1. Upload the plugin folder `amazer-whois-analytics` to `/wp-content/plugins/` directory, or upload the `.zip` archive via **Plugins > Add New > Upload Plugin**.
+1. Upload the plugin folder `amazer-visitors-intelligence-analytics` to `/wp-content/plugins/` directory, or upload the `.zip` archive via **Plugins > Add New > Upload Plugin**.
 2. Activate the plugin through the **Plugins** menu in WordPress.
 3. Once activated, storefront visitor telemetry begins capturing automatically.
-4. Access the full intelligence portal under **Amazer Analytics (WHOIS)** in your WordPress admin menu.
+4. Access the full intelligence portal under **Amazer VI Analytics** in your WordPress admin menu.
 
 == Frequently Asked Questions ==
 

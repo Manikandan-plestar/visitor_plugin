@@ -5,12 +5,13 @@ import '../shared/index.css';
 
 function mountMerchantApp() {
   const container =
+    document.getElementById('amazer-via-dashboard-root') ||
     document.getElementById('amazer-whois-dashboard-root') ||
     document.getElementById('svt-dashboard-root') ||
     document.getElementById('svt-network-dashboard-root');
 
-  if (container && !container.__amazerWhoisMounted) {
-    container.__amazerWhoisMounted = true;
+  if (container && !container.__amazerViaMounted) {
+    container.__amazerViaMounted = true;
     const root = createRoot(container);
     root.render(
       <React.StrictMode>
