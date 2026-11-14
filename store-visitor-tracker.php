@@ -80,6 +80,12 @@ function amazer_via_enqueue_storefront_tracker() {
         return;
     }
 
+    // Prior explicit user consent check per WordPress Guideline 7:
+    // Storefront telemetry must NOT run automatically on activation without explicit opt-in.
+    if ( 'yes' !== get_option( 'amazer_via_tracking_enabled', 'no' ) ) {
+        return;
+    }
+
     $remote_endpoint = trailingslashit( amazer_via_get_api_url() ) . 'api/v1/track';
     $store_url       = esc_url_raw( get_site_url() );
 
@@ -197,11 +203,12 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
         );
 
         wp_localize_script( 'amazer-via-bundle-js', 'amazerViSettings', array(
-            'storeUrl' => esc_url( get_site_url() ),
-            'apiUrl'   => amazer_via_get_api_url(),
-            'siteName' => get_bloginfo( 'name' ),
-            'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-            'nonce'    => wp_create_nonce( 'amazer_via_nonce' ),
+            'storeUrl'        => esc_url( get_site_url() ),
+            'apiUrl'          => amazer_via_get_api_url(),
+            'siteName'        => get_bloginfo( 'name' ),
+            'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
+            'nonce'           => wp_create_nonce( 'amazer_via_nonce' ),
+            'trackingEnabled' => get_option( 'amazer_via_tracking_enabled', 'no' ),
         ) );
     }
 }
@@ -239,6 +246,29 @@ function amazer_via_ajax_save_endpoint() {
     ) );
 }
 add_action( 'wp_ajax_amazer_via_save_endpoint', 'amazer_via_ajax_save_endpoint' );
+
+/**
+ * AJAX Handler: Toggle Storefront Tracking Consent (Explicit User Opt-in)
+ * Strictly complies with WordPress Guideline 7: Zero automatic telemetry without consent.
+ */
+function amazer_via_ajax_toggle_tracking() {
+    check_ajax_referer( 'amazer_via_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+
+    $enabled = isset( $_POST['enabled'] ) && 'yes' === sanitize_text_field( wp_unslash( $_POST['enabled'] ) ) ? 'yes' : 'no';
+    update_option( 'amazer_via_tracking_enabled', $enabled );
+
+    wp_send_json_success( array(
+        'tracking_enabled' => $enabled,
+        'message'          => 'yes' === $enabled
+            ? __( 'Storefront visitor telemetry enabled successfully.', 'amazer-visitors-intelligence-analytics' )
+            : __( 'Storefront visitor telemetry paused.', 'amazer-visitors-intelligence-analytics' ),
+    ) );
+}
+add_action( 'wp_ajax_amazer_via_toggle_tracking', 'amazer_via_ajax_toggle_tracking' );
 
 /**
  * Render the React Dashboard Root Container

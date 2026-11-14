@@ -208,6 +208,32 @@ export default function MerchantDashboard() {
     }
   });
 
+  // Storefront Telemetry Consent State (Explicit Opt-In per WordPress Guideline 7)
+  const [trackingEnabled, setTrackingEnabled] = useState(
+    wpSettings.trackingEnabled === 'yes'
+  );
+  const [togglingTracking, setTogglingTracking] = useState(false);
+
+  const handleToggleTracking = async () => {
+    if (!wpSettings.ajaxUrl || !wpSettings.nonce) return;
+    setTogglingTracking(true);
+    const nextState = trackingEnabled ? 'no' : 'yes';
+    try {
+      const form = new FormData();
+      form.append('action', 'amazer_via_toggle_tracking');
+      form.append('nonce', wpSettings.nonce);
+      form.append('enabled', nextState);
+      const res = await fetch(wpSettings.ajaxUrl, { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.success) {
+        setTrackingEnabled(nextState === 'yes');
+      }
+    } catch (e) {
+    } finally {
+      setTogglingTracking(false);
+    }
+  };
+
   const handleDeleteDemoIp = (ip, id) => {
     setDeletedDemoIps((prev) => {
       const next = [...new Set([...prev, ip, String(id)])];
@@ -431,6 +457,21 @@ export default function MerchantDashboard() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
+            onClick={handleToggleTracking}
+            disabled={togglingTracking}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 shadow-2xs ${
+              trackingEnabled
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+            }`}
+            title="Click to toggle storefront visitor tracking consent"
+          >
+            <span className={`w-2 h-2 rounded-full ${trackingEnabled ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            <span>{togglingTracking ? 'Saving...' : trackingEnabled ? 'Tracking Active' : 'Tracking Paused'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={fetchLiveAnalytics}
             className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-all flex items-center gap-1.5"
             title="Refresh analytics data"
@@ -440,6 +481,29 @@ export default function MerchantDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Explicit Consent Notice Banner (WordPress Guideline 7) */}
+      {!trackingEnabled && (
+        <div className="mb-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <span className="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </span>
+            <div>
+              <h4 className="text-sm font-bold text-amber-950">Storefront Visitor Intelligence is Inactive</h4>
+              <p className="text-xs text-amber-800 mt-0.5">Per WordPress privacy guidelines, visitor telemetry is disabled by default upon activation. Click Enable to begin capturing and identifying visiting businesses.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleTracking}
+            disabled={togglingTracking}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
+          >
+            {togglingTracking ? 'Enabling...' : 'Enable Visitor Tracking'}
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="mb-3.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">

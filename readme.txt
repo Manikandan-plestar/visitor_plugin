@@ -44,10 +44,13 @@ To build or compile the JavaScript bundle from source:
 
 1. Upload the plugin folder `amazer-visitors-intelligence-analytics` to `/wp-content/plugins/` directory, or upload the `.zip` archive via **Plugins > Add New > Upload Plugin**.
 2. Activate the plugin through the **Plugins** menu in WordPress.
-3. Once activated, storefront visitor telemetry begins capturing automatically.
-4. Access the full intelligence portal under **Amazer VI Analytics** in your WordPress admin menu.
+3. Access the intelligence portal under **Amazer VI Analytics** in your WordPress admin menu.
+4. In compliance with WordPress privacy guidelines, click "Enable Visitor Tracking" in the dashboard to grant explicit consent and start capturing visitor intelligence.
 
 == Frequently Asked Questions ==
+
+= Does this plugin track visitors automatically upon activation? =
+No. In strict compliance with WordPress.org Guideline 7, storefront telemetry remains completely disabled upon activation. The site administrator must grant explicit consent by clicking "Enable Visitor Tracking" in the Amazer VI Analytics dashboard before any telemetry is dispatched to the central service.
 
 = Does this plugin slow down my store? =
 No. Visitor telemetry is dispatched asynchronously using the browser's native `navigator.sendBeacon` API. If `sendBeacon` is unsupported, it falls back to a non-blocking background fetch call that never impedes page render time or customer experience.
