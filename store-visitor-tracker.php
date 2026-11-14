@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Amazer Analytics(WHOIS)
+ * Plugin Name: Amazer Analytics (WHOIS)
  * Plugin URI: https://amazerinc.com/amazer-analytics.html
  * Description: Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal visiting company names, corporate IPs, and pages without forms.
  * Version: 1.0.0
@@ -155,8 +155,8 @@ add_action( 'wp_enqueue_scripts', 'amazer_whois_enqueue_storefront_tracker' );
  */
 function amazer_whois_register_admin_dashboard_menu() {
     add_menu_page(
-        __( 'Amazer Analytics(WHOIS)', 'amazer-whois-analytics' ),
-        __( 'Amazer Analytics(WHOIS)', 'amazer-whois-analytics' ),
+        __( 'Amazer Analytics (WHOIS)', 'amazer-whois-analytics' ),
+        __( 'Amazer Analytics (WHOIS)', 'amazer-whois-analytics' ),
         'manage_options',
         'amazer-whois-dashboard',
         'amazer_whois_render_dashboard_container',
@@ -261,8 +261,8 @@ function amazer_whois_render_dashboard_container() {
         <div id="amazer-whois-dashboard-root">
             <?php if ( ! file_exists( $bundle_js ) ) : ?>
                 <div style="padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 20px; max-width: 650px;">
-                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer Analytics(WHOIS) Dashboard', 'amazer-whois-analytics' ); ?></h2>
-                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer Analytics(WHOIS) dashboard:', 'amazer-whois-analytics' ); ?></p>
+                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer Analytics (WHOIS) Dashboard', 'amazer-whois-analytics' ); ?></h2>
+                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer Analytics (WHOIS) dashboard:', 'amazer-whois-analytics' ); ?></p>
                     <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 6px;">npm run build</pre>
                 </div>
             <?php endif; ?>
