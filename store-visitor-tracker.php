@@ -163,16 +163,6 @@ function amazer_via_register_admin_dashboard_menu() {
         'dashicons-visibility',
         30
     );
-
-    // Keep alias for network analytics slug
-    add_submenu_page(
-        null,
-        __( 'Network Analytics', 'amazer-visitors-intelligence-analytics' ),
-        __( 'Network Analytics', 'amazer-visitors-intelligence-analytics' ),
-        'manage_options',
-        'amazer-via-network-analytics',
-        'amazer_via_render_dashboard_container'
-    );
 }
 add_action( 'admin_menu', 'amazer_via_register_admin_dashboard_menu' );
 
@@ -180,8 +170,7 @@ add_action( 'admin_menu', 'amazer_via_register_admin_dashboard_menu' );
  * Enqueue Dashboard Assets on plugin page
  */
 function amazer_via_enqueue_admin_assets( $hook_suffix ) {
-    if ( strpos( (string) $hook_suffix, 'amazer-visitors-intelligence-analytics' ) === false &&
-         strpos( (string) $hook_suffix, 'amazer-via-network-analytics' ) === false ) {
+    if ( strpos( (string) $hook_suffix, 'amazer-visitors-intelligence-analytics' ) === false ) {
         return;
     }
 
