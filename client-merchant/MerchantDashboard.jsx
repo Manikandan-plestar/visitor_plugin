@@ -491,7 +491,11 @@ export default function MerchantDashboard() {
             </span>
             <div>
               <h4 className="text-sm font-bold text-amber-950">Storefront Visitor Intelligence is Inactive</h4>
-              <p className="text-xs text-amber-800 mt-0.5">Per WordPress privacy guidelines, visitor telemetry is disabled by default upon activation. Click Enable to begin capturing and identifying visiting businesses.</p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Per WordPress privacy guidelines, visitor telemetry is disabled by default upon activation. Click Enable to begin capturing and identifying visiting businesses via Amazer Cloud API in accordance with our{' '}
+                <a href="https://plestar.net/amazer-analytics/terms.html" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-amber-950">Terms of Service</a>{' '}and{' '}
+                <a href="https://plestar.net/amazer-analytics/privacy.html" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-amber-950">Privacy Policy</a>.
+              </p>
             </div>
           </div>
           <button

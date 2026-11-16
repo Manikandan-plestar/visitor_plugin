@@ -42,7 +42,7 @@ To build or compile the JavaScript bundle from source:
 
 == Installation ==
 
-1. Upload the plugin folder `amazer-visitors-intelligence-analytics` to `/wp-content/plugins/` directory, or upload the `.zip` archive via **Plugins > Add New > Upload Plugin**.
+1. Upload the plugin folder `amazer-whois-analytics` to `/wp-content/plugins/` directory, or upload the `amazer-whois-analytics.zip` archive via **Plugins > Add New > Upload Plugin**.
 2. Activate the plugin through the **Plugins** menu in WordPress.
 3. Access the intelligence portal under **Amazer VI Analytics** in your WordPress admin menu.
 4. In compliance with WordPress privacy guidelines, click "Enable Visitor Tracking" in the dashboard to grant explicit consent and start capturing visitor intelligence.

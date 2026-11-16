@@ -10,7 +10,7 @@
  * Author URI: https://amazerinc.com/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: amazer-visitors-intelligence-analytics
+ * Text Domain: amazer-whois-analytics
  */
 
 // Deny direct script execution
@@ -54,8 +54,8 @@ function amazer_via_get_api_url() {
 function amazer_via_add_action_links( $links ) {
     $dashboard_link = sprintf(
         '<a href="%s">%s</a>',
-        esc_url( admin_url( 'admin.php?page=amazer-visitors-intelligence-analytics' ) ),
-        esc_html__( 'Dashboard', 'amazer-visitors-intelligence-analytics' )
+        esc_url( admin_url( 'admin.php?page=amazer-whois-analytics' ) ),
+        esc_html__( 'Dashboard', 'amazer-whois-analytics' )
     );
     array_unshift( $links, $dashboard_link );
     return $links;
@@ -161,10 +161,10 @@ add_action( 'wp_enqueue_scripts', 'amazer_via_enqueue_storefront_tracker' );
  */
 function amazer_via_register_admin_dashboard_menu() {
     add_menu_page(
-        __( 'Amazer VI Analytics', 'amazer-visitors-intelligence-analytics' ),
-        __( 'Amazer VI Analytics', 'amazer-visitors-intelligence-analytics' ),
+        __( 'Amazer VI Analytics', 'amazer-whois-analytics' ),
+        __( 'Amazer VI Analytics', 'amazer-whois-analytics' ),
         'manage_options',
-        'amazer-visitors-intelligence-analytics',
+        'amazer-whois-analytics',
         'amazer_via_render_dashboard_container',
         'dashicons-visibility',
         30
@@ -249,7 +249,7 @@ function amazer_via_ajax_save_endpoint() {
     }
 
     wp_send_json_success( array(
-        'message' => __( 'Endpoint configuration updated successfully.', 'amazer-visitors-intelligence-analytics' ),
+        'message' => __( 'Endpoint configuration updated successfully.', 'amazer-whois-analytics' ),
         'apiUrl'  => get_option( 'amazer_via_central_api_url' ),
     ) );
 }
@@ -272,8 +272,8 @@ function amazer_via_ajax_toggle_tracking() {
     wp_send_json_success( array(
         'tracking_enabled' => $enabled,
         'message'          => 'yes' === $enabled
-            ? __( 'Storefront visitor telemetry enabled successfully.', 'amazer-visitors-intelligence-analytics' )
-            : __( 'Storefront visitor telemetry paused.', 'amazer-visitors-intelligence-analytics' ),
+            ? __( 'Storefront visitor telemetry enabled successfully.', 'amazer-whois-analytics' )
+            : __( 'Storefront visitor telemetry paused.', 'amazer-whois-analytics' ),
     ) );
 }
 add_action( 'wp_ajax_amazer_via_toggle_tracking', 'amazer_via_ajax_toggle_tracking' );
@@ -288,8 +288,8 @@ function amazer_via_render_dashboard_container() {
         <div id="amazer-via-dashboard-root">
             <?php if ( ! file_exists( $bundle_js ) ) : ?>
                 <div style="padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 20px; max-width: 650px;">
-                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer VI Analytics Dashboard', 'amazer-visitors-intelligence-analytics' ); ?></h2>
-                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer VI Analytics dashboard:', 'amazer-visitors-intelligence-analytics' ); ?></p>
+                    <h2 style="margin-top: 0; color: #0f172a;"><?php esc_html_e( 'Amazer VI Analytics Dashboard', 'amazer-whois-analytics' ); ?></h2>
+                    <p style="color: #64748b;"><?php esc_html_e( 'Please compile assets to view the Amazer VI Analytics dashboard:', 'amazer-whois-analytics' ); ?></p>
                     <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 6px;">npm run build</pre>
                 </div>
             <?php endif; ?>
