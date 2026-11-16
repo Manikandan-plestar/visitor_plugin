@@ -184,6 +184,28 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
     duration_seconds: 210,
     visited_at: new Date(Date.now() - 1000 * 60 * 80).toISOString(),
   },
+  {
+    id: 'demo_gen_4',
+    is_demo: true,
+    visitor_ip: '104.244.42.1',
+    page_url: '/pricing',
+    referrer: 'https://x.com/amazer_analytics',
+    screen_res: '1920x1080',
+    browser: 'Chrome 122',
+    duration_seconds: 95,
+    visited_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+  },
+  {
+    id: 'demo_gen_5',
+    is_demo: true,
+    visitor_ip: '108.177.15.10',
+    page_url: '/products',
+    referrer: 'Direct Navigation',
+    screen_res: '1440x900',
+    browser: 'Firefox 124',
+    duration_seconds: 60,
+    visited_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+  },
 ];
 
 export default function MerchantDashboard() {
@@ -410,6 +432,7 @@ export default function MerchantDashboard() {
       page_visits: (c.hits || []).map((h, i) => ({
         id: 'hit_' + (h.id || i),
         visitor_ip: h.visitor_ip,
+        visited_at: h.visited_at,
         date_time: formatHitTime(h.visited_at),
         duration: formatDuration(h.duration_seconds || 60),
         page_url: h.page_url || '/',
