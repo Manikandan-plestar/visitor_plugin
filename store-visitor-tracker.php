@@ -80,7 +80,7 @@ function amazer_via_enqueue_storefront_tracker() {
         return;
     }
 
-    // Prior explicit user consent check per WordPress Guideline 7:
+    // Prior explicit user consent check as per WordPress Guideline 7:
     // Storefront telemetry must NOT run automatically on activation without explicit opt-in.
     if ( 'yes' !== get_option( 'amazer_via_tracking_enabled', 'no' ) ) {
         return;

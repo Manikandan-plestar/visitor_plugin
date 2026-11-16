@@ -490,9 +490,9 @@ export default function MerchantDashboard() {
               <AlertCircle className="w-5 h-5" />
             </span>
             <div>
-              <h4 className="text-sm font-bold text-amber-950">Storefront Visitor Intelligence is Inactive</h4>
+              <h4 className="text-sm font-bold text-amber-950">Amazer Visitor Intelligence is Inactive</h4>
               <p className="text-xs text-amber-800 mt-0.5">
-                Per WordPress privacy guidelines, visitor telemetry is disabled by default upon activation. Click Enable to begin capturing and identifying visiting businesses via Amazer Cloud API in accordance with our{' '}
+                As per WordPress privacy guidelines, visitor telemetry is disabled by default upon activation. Click Enable to begin capturing and identifying visiting businesses via Amazer Cloud API in accordance with our{' '}
                 <a href="https://plestar.net/amazer-analytics/terms.html" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-amber-950">Terms of Service</a>{' '}and{' '}
                 <a href="https://plestar.net/amazer-analytics/privacy.html" target="_blank" rel="noopener noreferrer" className="underline font-semibold hover:text-amber-950">Privacy Policy</a>.
               </p>
@@ -504,7 +504,7 @@ export default function MerchantDashboard() {
             disabled={togglingTracking}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
           >
-            {togglingTracking ? 'Enabling...' : 'Enable Visitor Tracking'}
+            {togglingTracking ? 'Enabling...' : 'Enable Amazer Visitor Intelligence'}
           </button>
         </div>
       )}
