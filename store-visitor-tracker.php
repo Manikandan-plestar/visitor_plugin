@@ -114,6 +114,7 @@ function amazer_via_enqueue_storefront_tracker() {
             else if (ua.indexOf('Safari') > -1 && ua.indexOf('Chrome') === -1) browser = 'Safari';
             else if (ua.indexOf('Edg') > -1) browser = 'Edge';
 
+            var startTime = Date.now();
             var payload = {
                 visitor_id: visitorId,
                 store_url: " . wp_json_encode( $store_url ) . ",
@@ -147,6 +148,27 @@ function amazer_via_enqueue_storefront_tracker() {
                     body: dataStr
                 }).catch(function() {});
             }
+
+            var sendDwellBeacon = function() {
+                var elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+                if (elapsed <= 1) return;
+                var dwellPayload = JSON.stringify({
+                    visitor_id: visitorId,
+                    store_url: " . wp_json_encode( $store_url ) . ",
+                    page_url: window.location.pathname || '/',
+                    duration_seconds: elapsed,
+                    timestamp: new Date().toISOString()
+                });
+                if (typeof navigator.sendBeacon === 'function') {
+                    try {
+                        navigator.sendBeacon(remoteUrl, new Blob([dwellPayload], { type: 'application/json' }));
+                    } catch (e) {}
+                }
+            };
+            window.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') sendDwellBeacon();
+            });
+            window.addEventListener('beforeunload', sendDwellBeacon);
         } catch (ex) {}
     })();";
 
@@ -203,12 +225,16 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
         );
 
         wp_localize_script( 'amazer-via-bundle-js', 'amazerViSettings', array(
-            'storeUrl'        => esc_url( get_site_url() ),
-            'apiUrl'          => amazer_via_get_api_url(),
-            'siteName'        => get_bloginfo( 'name' ),
-            'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
-            'nonce'           => wp_create_nonce( 'amazer_via_nonce' ),
-            'trackingEnabled' => get_option( 'amazer_via_tracking_enabled', 'no' ),
+            'storeUrl'            => esc_url( get_site_url() ),
+            'apiUrl'              => amazer_via_get_api_url(),
+            'siteName'            => get_bloginfo( 'name' ),
+            'ajaxUrl'             => admin_url( 'admin-ajax.php' ),
+            'nonce'               => wp_create_nonce( 'amazer_via_nonce' ),
+            'trackingEnabled'     => get_option( 'amazer_via_tracking_enabled', 'no' ),
+            'opportunityUrl'      => get_option( 'amazer_via_opportunity_url', '/pricing' ),
+            'opportunityDuration' => (int) get_option( 'amazer_via_opportunity_duration', 60 ),
+            'slippedEnabled'      => get_option( 'amazer_via_slipped_enabled', 'yes' ),
+            'slippedWindow'       => get_option( 'amazer_via_slipped_window', '48h' ),
         ) );
     }
 }
@@ -269,6 +295,54 @@ function amazer_via_ajax_toggle_tracking() {
     ) );
 }
 add_action( 'wp_ajax_amazer_via_toggle_tracking', 'amazer_via_ajax_toggle_tracking' );
+
+/**
+ * AJAX Handler: Save Opportunity Tracking Settings
+ */
+function amazer_via_ajax_save_opportunity_settings() {
+    check_ajax_referer( 'amazer_via_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+
+    $url      = isset( $_POST['opportunity_url'] ) ? sanitize_text_field( wp_unslash( $_POST['opportunity_url'] ) ) : '/pricing';
+    $duration = isset( $_POST['opportunity_duration'] ) ? absint( wp_unslash( $_POST['opportunity_duration'] ) ) : 60;
+
+    update_option( 'amazer_via_opportunity_url', $url );
+    update_option( 'amazer_via_opportunity_duration', $duration );
+
+    wp_send_json_success( array(
+        'message'              => __( 'Opportunity tracking settings saved successfully.', 'amazer-visitor-intelligence' ),
+        'opportunity_url'      => $url,
+        'opportunity_duration' => $duration,
+    ) );
+}
+add_action( 'wp_ajax_amazer_via_save_opportunity_settings', 'amazer_via_ajax_save_opportunity_settings' );
+
+/**
+ * AJAX Handler: Save Slipped Tracking Settings
+ */
+function amazer_via_ajax_save_slipped_settings() {
+    check_ajax_referer( 'amazer_via_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+
+    $enabled = isset( $_POST['slipped_enabled'] ) && 'yes' === sanitize_text_field( wp_unslash( $_POST['slipped_enabled'] ) ) ? 'yes' : 'no';
+    $window  = isset( $_POST['slipped_window'] ) ? sanitize_text_field( wp_unslash( $_POST['slipped_window'] ) ) : '48h';
+
+    update_option( 'amazer_via_slipped_enabled', $enabled );
+    update_option( 'amazer_via_slipped_window', $window );
+
+    wp_send_json_success( array(
+        'message'         => __( 'Slipped tracking preferences updated successfully.', 'amazer-visitor-intelligence' ),
+        'slipped_enabled' => $enabled,
+        'slipped_window'  => $window,
+    ) );
+}
+add_action( 'wp_ajax_amazer_via_save_slipped_settings', 'amazer_via_ajax_save_slipped_settings' );
 
 /**
  * Render the React Dashboard Root Container

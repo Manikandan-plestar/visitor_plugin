@@ -1,40 +1,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Building2,
-  Eye,
-  MapPin,
-  Phone,
-  Mail,
   Globe,
-  Search,
-  ChevronRight,
-  ChevronDown,
-  ExternalLink,
   Clock,
-  Monitor,
-  Laptop,
-  Smartphone,
-  Layers,
-  Sparkles,
   RefreshCw,
-  SlidersHorizontal,
-  ShieldCheck,
-  Compass,
-  ArrowUpRight,
-  UserCheck,
-  Check,
   AlertCircle,
-  HelpCircle,
   Zap,
-  Filter,
-  X,
-  Flame,
-  Send,
   Users,
-  Info,
-  Wifi,
+  ShoppingBag,
+  SlidersHorizontal,
+  LayoutDashboard,
+  Check,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
+
+import DashboardTab from './pages/DashboardTab';
+import TrafficTab from './pages/TrafficTab';
+import FirmographicTab from './pages/FirmographicTab';
+import DemographicTab from './pages/DemographicTab';
+import OpportunityTab from './pages/OpportunityTab';
+import SlippedTab from './pages/SlippedTab';
+import SettingsTab from './pages/SettingsTab';
 
 // Educational Sample Demo Data (Displayed initially so new users can visualize intelligence)
 const DEFAULT_DEMO_COMPANIES = [
@@ -130,6 +117,37 @@ const DEFAULT_DEMO_COMPANIES = [
       },
     ],
   },
+  {
+    id: 'demo_thomassmith',
+    is_demo: true,
+    company_name: 'Thomas Smith Fasteners Ltd',
+    activation_ip: '195.144.11.22',
+    status: 'watching',
+    physical_address: 'Unit 2A, Swan Business Centre, Swan Lane, Hindley Green, Wigan WN2 4AT, UK',
+    telephone: '01942 520260',
+    official_email: 'sales@thomassmithfasteners.com',
+    website: 'https://thomassmithfasteners.com',
+    linkedin_url: 'https://linkedin.com/company/thomas-smith-fasteners',
+    twitter_url: 'https://twitter.com/ts_fasteners',
+    industry: 'Industrial Fasteners & Hardware Engineering',
+    acquisition_channel: 'Google Organic Search',
+    is_partner_store: 0,
+    total_visits: 1,
+    total_page_views: 1,
+    total_dwell_seconds: 95,
+    hits: [
+      {
+        id: 'demo_hit_6',
+        visitor_ip: '195.144.11.22',
+        page_url: '/our-plans',
+        referrer: 'https://www.google.com',
+        screen_res: '768x1024',
+        browser: 'Safari 17',
+        duration_seconds: 95,
+        visited_at: new Date(Date.now() - 1000 * 60 * 210).toISOString(),
+      },
+    ],
+  },
 ];
 
 const DEFAULT_DEMO_GENERAL_VISITORS = [
@@ -179,22 +197,30 @@ export default function MerchantDashboard() {
     siteName: 'My Storefront',
     ajaxUrl: '/wp-admin/admin-ajax.php',
     nonce: '',
+    trackingEnabled: 'no',
+    opportunityUrl: '/pricing',
+    opportunityDuration: 60,
+    slippedEnabled: 'yes',
+    slippedWindow: '48h',
   };
 
-  // State: Direct MySQL Database Live Data
+  // Active Multi-Page Route Tab
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'traffic' | 'firmographic' | 'demographic' | 'opportunity' | 'slipped' | 'settings'
+
+  // Data States
   const [liveCompanies, setLiveCompanies] = useState([]);
   const [generalVisitors, setGeneralVisitors] = useState([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
-  const [selectedGeneralIp, setSelectedGeneralIp] = useState(null);
-  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'GENERAL'
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Demo IP Management State (Persisted in localStorage so merchants can delete demo items)
+  // Selected company ID in Firmographic view
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+
+  // Demo Data State
   const [deletedDemoIps, setDeletedDemoIps] = useState(() => {
     try {
-      const saved = localStorage.getItem('amazer_deleted_demo_ips');
-      return saved ? JSON.parse(saved) : [];
+      const stored = localStorage.getItem('_amazer_via_deleted_demo_ips');
+      return stored ? JSON.parse(stored) : [];
     } catch (e) {
       return [];
     }
@@ -202,70 +228,44 @@ export default function MerchantDashboard() {
 
   const [allDemoDismissed, setAllDemoDismissed] = useState(() => {
     try {
-      return localStorage.getItem('amazer_demo_dismissed') === 'true';
+      return localStorage.getItem('_amazer_via_all_demo_dismissed') === 'true';
     } catch (e) {
       return false;
     }
   });
 
-  // Storefront Telemetry Consent State (Explicit Opt-In per WordPress Guideline 7)
-  const [trackingEnabled, setTrackingEnabled] = useState(
-    wpSettings.trackingEnabled === 'yes'
-  );
+  // Settings States
+  const [trackingEnabled, setTrackingEnabled] = useState(wpSettings.trackingEnabled === 'yes');
   const [togglingTracking, setTogglingTracking] = useState(false);
+  const [opportunityUrl, setOpportunityUrl] = useState(wpSettings.opportunityUrl || '/pricing');
+  const [opportunityDuration, setOpportunityDuration] = useState(wpSettings.opportunityDuration || 60);
+  const [slippedEnabled, setSlippedEnabled] = useState(wpSettings.slippedEnabled !== 'no');
+  const [slippedWindow, setSlippedWindow] = useState(wpSettings.slippedWindow || '48h');
 
-  const handleToggleTracking = async () => {
-    if (!wpSettings.ajaxUrl || !wpSettings.nonce) return;
-    setTogglingTracking(true);
-    const nextState = trackingEnabled ? 'no' : 'yes';
+  // Time & Duration Formatting Helpers
+  const formatDuration = (totalSeconds) => {
+    const s = parseInt(totalSeconds, 10) || 60;
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m < 10 ? '0' : ''}${m}:${rem < 10 ? '0' : ''}${rem}`;
+  };
+
+  const formatHitTime = (isoString) => {
+    if (!isoString) return 'Just now';
     try {
-      const form = new FormData();
-      form.append('action', 'amazer_via_toggle_tracking');
-      form.append('nonce', wpSettings.nonce);
-      form.append('enabled', nextState);
-      const res = await fetch(wpSettings.ajaxUrl, { method: 'POST', body: form });
-      const data = await res.json();
-      if (data.success) {
-        setTrackingEnabled(nextState === 'yes');
-      }
+      const d = new Date(isoString);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch (e) {
-    } finally {
-      setTogglingTracking(false);
+      return 'Recent';
     }
   };
 
-  const handleDeleteDemoIp = (ip, id) => {
-    setDeletedDemoIps((prev) => {
-      const next = [...new Set([...prev, ip, String(id)])];
-      try {
-        localStorage.setItem('amazer_deleted_demo_ips', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  };
-
-  const handleDeleteAllDemo = () => {
-    setAllDemoDismissed(true);
-    try {
-      localStorage.setItem('amazer_demo_dismissed', 'true');
-    } catch (e) {}
-  };
-
-  const handleRestoreDemo = () => {
-    setAllDemoDismissed(false);
-    setDeletedDemoIps([]);
-    try {
-      localStorage.removeItem('amazer_demo_dismissed');
-      localStorage.removeItem('amazer_deleted_demo_ips');
-    } catch (e) {}
-  };
-
-  // Fetch Live Analytics Data from Central Express Node Backend (Connected to MySQL)
+  // Fetch Live Analytics from Backend API
   const fetchLiveAnalytics = async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const url = `${wpSettings.apiUrl}/api/v1/analytics/visitor-detail?storeUrl=${encodeURIComponent(
+      const url = `${wpSettings.apiUrl.replace(/\/+$/, '')}/api/v1/analytics/visitor-detail?storeUrl=${encodeURIComponent(
         wpSettings.storeUrl
       )}`;
       const res = await fetch(url);
@@ -289,12 +289,11 @@ export default function MerchantDashboard() {
     }
   };
 
-  // Initial fetch on component mount
   useEffect(() => {
     fetchLiveAnalytics();
   }, []);
 
-  // Filtered Demo Data (Excludes individually deleted demo records)
+  // Filtered Demo Data
   const visibleDemoCompanies = useMemo(() => {
     if (allDemoDismissed) return [];
     return DEFAULT_DEMO_COMPANIES.filter(
@@ -309,7 +308,7 @@ export default function MerchantDashboard() {
     );
   }, [allDemoDismissed, deletedDemoIps]);
 
-  // Combined Data: Live Database records merged with Demo records if active
+  // Combined Data: Live records merged with Demo records
   const combinedCompanies = useMemo(() => {
     if (liveCompanies.length > 0) {
       return [...liveCompanies, ...visibleDemoCompanies];
@@ -326,7 +325,7 @@ export default function MerchantDashboard() {
 
   const isShowingDemo = visibleDemoCompanies.length > 0 || visibleDemoGeneralVisitors.length > 0;
 
-  // Active Company List
+  // Active Company List with formatted fields
   const companies = useMemo(() => {
     return combinedCompanies.map((c) => ({
       id: c.id,
@@ -348,7 +347,6 @@ export default function MerchantDashboard() {
         : 'bg-blue-600',
       status: c.status || 'company',
       is_partner_store: Boolean(c.is_partner_store),
-      tags: [c.status === 'watching' ? 'Watching' : 'Company'],
       physical_address: c.physical_address || 'Address pending enrichment',
       telephone: c.telephone || '--',
       official_email: c.official_email || '--',
@@ -357,86 +355,120 @@ export default function MerchantDashboard() {
       twitter_url: c.twitter_url,
       industry: c.industry || 'B2B Enterprise',
       acquisition_channel: c.acquisition_channel || 'Direct Navigation',
-      acquisition_badge: c.acquisition_channel?.includes('Google') ? 'Google' : 'Direct',
       time_on_site: formatDuration(c.total_dwell_seconds || 120),
       total_visits: c.total_visits || 1,
       total_page_views: c.total_page_views || 1,
       page_visits: (c.hits || []).map((h, i) => ({
         id: 'hit_' + (h.id || i),
         visitor_ip: h.visitor_ip,
-        status: 'active',
         date_time: formatHitTime(h.visited_at),
         duration: formatDuration(h.duration_seconds || 60),
         page_url: h.page_url || '/',
         browser: h.browser || 'Chrome',
         screen_res: h.screen_res || '1920x1080',
-        device_type: 'Desktop',
+        device_type: (h.browser || '').includes('Mobile') ? 'Mobile' : 'Desktop',
         referrer: h.referrer || 'Direct Navigation',
-        is_single_page: !h.duration_seconds || h.duration_seconds < 40,
       })),
     }));
   }, [combinedCompanies]);
 
-  // Selected Company
-  const selectedCompany = useMemo(() => {
-    return companies.find((c) => String(c.id) === String(selectedCompanyId)) || companies[0] || null;
+  // Set initial selected company
+  useEffect(() => {
+    if (!selectedCompanyId && companies.length > 0) {
+      setSelectedCompanyId(companies[0].id);
+    }
   }, [companies, selectedCompanyId]);
 
-  // Group General Website Visitors by IP and sort by Highest Hits first
-  const groupedGeneralVisitors = useMemo(() => {
-    if (!combinedGeneralVisitors || combinedGeneralVisitors.length === 0) return [];
-    const map = new Map();
-    combinedGeneralVisitors.forEach((hit) => {
-      const ip = hit.visitor_ip || 'Unknown IP';
-      if (!map.has(ip)) {
-        map.set(ip, {
-          ip,
-          is_demo: Boolean(hit.is_demo),
-          total_hits: 0,
-          total_dwell_seconds: 0,
-          browser: hit.browser || 'Chrome',
-          screen_res: hit.screen_res || '1920x1080',
-          latest_visit: hit.visited_at,
-          referrer: hit.referrer || 'Direct Navigation',
-          hits: [],
-        });
-      }
-      const item = map.get(ip);
-      item.total_hits += 1;
-      item.total_dwell_seconds += (hit.duration_seconds || 60);
-      if (new Date(hit.visited_at) > new Date(item.latest_visit)) {
-        item.latest_visit = hit.visited_at;
-      }
-      item.hits.push(hit);
+  // All flattened hits across the storefront
+  const allHits = useMemo(() => {
+    const list = [];
+    companies.forEach((c) => {
+      (c.hits || []).forEach((h) => list.push({ ...h, isCorporate: true, companyName: c.company_name }));
     });
-
-    const list = Array.from(map.values()).sort((a, b) => {
-      if (b.total_hits !== a.total_hits) {
-        return b.total_hits - a.total_hits;
-      }
-      return b.total_dwell_seconds - a.total_dwell_seconds;
+    combinedGeneralVisitors.forEach((g) => {
+      list.push({ ...g, isCorporate: false, companyName: 'General Visitor' });
     });
-
-    list.forEach((v) => {
-      v.hits.sort((a, b) => new Date(b.visited_at || 0) - new Date(a.visited_at || 0));
-    });
-
     return list;
-  }, [combinedGeneralVisitors]);
+  }, [companies, combinedGeneralVisitors]);
 
-  // Active General Visitor (defaults to #1 Highest Hit IP)
-  const activeGeneralVisitor = useMemo(() => {
-    if (groupedGeneralVisitors.length === 0) return null;
-    return (
-      groupedGeneralVisitors.find((v) => v.ip === selectedGeneralIp) ||
-      groupedGeneralVisitors[0]
-    );
-  }, [groupedGeneralVisitors, selectedGeneralIp]);
+  // Handler: Toggle Consent (Guideline 7 Compliance)
+  const handleToggleTracking = async () => {
+    const nextState = !trackingEnabled;
+    setTogglingTracking(true);
+    try {
+      const formData = new FormData();
+      formData.append('action', 'amazer_via_toggle_tracking');
+      formData.append('nonce', wpSettings.nonce);
+      formData.append('enabled', nextState ? 'yes' : 'no');
+
+      const res = await fetch(wpSettings.ajaxUrl, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTrackingEnabled(nextState);
+      }
+    } catch (e) {
+      setTrackingEnabled(nextState);
+    } finally {
+      setTogglingTracking(false);
+    }
+  };
+
+  // Handler: Save Opportunity Settings
+  const handleSaveOpportunitySettings = async (url, duration) => {
+    setOpportunityUrl(url);
+    setOpportunityDuration(duration);
+    const formData = new FormData();
+    formData.append('action', 'amazer_via_save_opportunity_settings');
+    formData.append('nonce', wpSettings.nonce);
+    formData.append('opportunity_url', url);
+    formData.append('opportunity_duration', duration);
+    await fetch(wpSettings.ajaxUrl, { method: 'POST', body: formData });
+  };
+
+  // Handler: Save Slipped Settings
+  const handleSaveSlippedSettings = async (enabled, window) => {
+    setSlippedEnabled(enabled);
+    setSlippedWindow(window);
+    const formData = new FormData();
+    formData.append('action', 'amazer_via_save_slipped_settings');
+    formData.append('nonce', wpSettings.nonce);
+    formData.append('slipped_enabled', enabled ? 'yes' : 'no');
+    formData.append('slipped_window', window);
+    await fetch(wpSettings.ajaxUrl, { method: 'POST', body: formData });
+  };
+
+  // Handler: Save API Endpoint
+  const handleSaveApiEndpoint = async (url) => {
+    const formData = new FormData();
+    formData.append('action', 'amazer_via_save_endpoint');
+    formData.append('nonce', wpSettings.nonce);
+    formData.append('api_url', url);
+    await fetch(wpSettings.ajaxUrl, { method: 'POST', body: formData });
+  };
+
+  // Handler: Delete Demo Data
+  const handleDeleteAllDemo = () => {
+    localStorage.setItem('_amazer_via_all_demo_dismissed', 'true');
+    setAllDemoDismissed(true);
+  };
+
+  const navTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'traffic', label: 'Traffic', icon: Globe },
+    { id: 'firmographic', label: 'Firmographic', icon: Building2 },
+    { id: 'demographic', label: 'Demographic', icon: Users },
+    { id: 'opportunity', label: 'Opportunity', icon: Zap },
+    { id: 'slipped', label: 'Slipped', icon: ShoppingBag },
+    { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
+  ];
 
   return (
     <div className="w-full bg-[#f4f6f9] text-slate-800 antialiased min-h-screen p-4 sm:p-5 font-sans">
-      {/* Top Banner / Navigation Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-3.5 border-b border-slate-200 gap-3">
+      {/* Top Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-3 border-b border-slate-200 gap-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 svt-pulsing-dot"></span>
@@ -459,7 +491,7 @@ export default function MerchantDashboard() {
             type="button"
             onClick={handleToggleTracking}
             disabled={togglingTracking}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 shadow-2xs ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer ${
               trackingEnabled
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                 : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
@@ -473,7 +505,7 @@ export default function MerchantDashboard() {
           <button
             type="button"
             onClick={fetchLiveAnalytics}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
             title="Refresh analytics data"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
@@ -482,9 +514,31 @@ export default function MerchantDashboard() {
         </div>
       </div>
 
+      {/* Multi-Page Navigation Tabs */}
+      <div className="mb-5 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-2xs flex flex-wrap items-center gap-1">
+        {navTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Explicit Consent Notice Banner (WordPress Guideline 7) */}
       {!trackingEnabled && (
-        <div className="mb-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-3">
             <span className="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0">
               <AlertCircle className="w-5 h-5" />
@@ -509,766 +563,96 @@ export default function MerchantDashboard() {
         </div>
       )}
 
+      {/* Demo Banner */}
+      {isShowingDemo && (
+        <div className="mb-4 p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 gap-2">
+          <span className="flex items-center gap-1.5 font-medium">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            Showing educational demo records alongside live telemetry so you can visualize the full intelligence dashboard.
+          </span>
+          <button
+            onClick={handleDeleteAllDemo}
+            className="px-2.5 py-1 bg-white hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 font-semibold cursor-pointer shrink-0 transition-colors"
+          >
+            Delete Demo Data
+          </button>
+        </div>
+      )}
+
+      {/* Backend Connection Error */}
       {errorMsg && (
-        <div className="mb-3.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+        <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Interactive Demo Mode Notice Banner */}
-      {isShowingDemo && (
-        <div className="mb-3.5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/90 to-purple-50/90 border border-blue-200/80 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-900">Demo Mode Active</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                  Data Preview
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                Displaying sample B2B companies & website visits so you can explore how real-time intelligence visualizes. You can delete demo records anytime.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleDeleteAllDemo}
-            className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-red-50 text-red-600 border border-red-200 shadow-2xs transition-all flex items-center gap-1.5 shrink-0"
-            title="Delete all demo data and show only real visitors"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-red-500" />
-            <span>Delete Demo Data</span>
-          </button>
-        </div>
-      )}
+      {/* Multi-Page Route Render */}
+      <div>
+        {activeTab === 'dashboard' && (
+          <DashboardTab
+            companies={companies}
+            generalVisitors={combinedGeneralVisitors}
+            allHits={allHits}
+            opportunityCount={
+              allHits.filter(
+                (h) => (h.page_url || '').includes(opportunityUrl) && (h.duration_seconds || 60) >= opportunityDuration
+              ).length
+            }
+            onSelectCompany={(id) => setSelectedCompanyId(id)}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+          />
+        )}
 
-      {/* 2 Primary Modes & Company Selector Dropdown */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm mb-3.5">
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-          {/* Tab 1: All Identified */}
-          <button
-            type="button"
-            onClick={() => setActiveFilter('ALL')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeFilter === 'ALL'
-                ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/10'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Building2 className="w-4 h-4 text-blue-400" />
-            <span>All Identified ({companies.length})</span>
-          </button>
+        {activeTab === 'traffic' && (
+          <TrafficTab
+            companies={companies}
+            generalVisitors={combinedGeneralVisitors}
+            allHits={allHits}
+            onSelectCompany={(id) => setSelectedCompanyId(id)}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+          />
+        )}
 
-          {/* Tab 2: General Visitors */}
-          <button
-            type="button"
-            onClick={() => setActiveFilter('GENERAL')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeFilter === 'GENERAL'
-                ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-600/10'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Users className="w-4 h-4 text-indigo-400" />
-            <span>General Visitors ({groupedGeneralVisitors.length})</span>
-          </button>
+        {activeTab === 'firmographic' && (
+          <FirmographicTab
+            companies={companies}
+            selectedCompanyId={selectedCompanyId}
+            onSelectCompany={(id) => setSelectedCompanyId(id)}
+          />
+        )}
 
-          {/* Placed immediately after General Visitors Tab */}
-          {activeFilter === 'ALL' && companies.length > 0 && (
-            <div className="flex items-center gap-2.5 sm:ml-2 sm:pl-4 sm:border-l border-slate-200">
-              <label htmlFor="company-dropdown" className="text-xs font-bold text-slate-500 whitespace-nowrap flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                <span>Select Company:</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="company-dropdown"
-                  value={selectedCompany?.id || ''}
-                  onChange={(e) => {
-                    const val = Number(e.target.value) || e.target.value;
-                    setSelectedCompanyId(val);
-                  }}
-                  className="appearance-none pl-3.5 pr-10 py-2 text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer shadow-xs min-w-[260px] sm:min-w-[320px] transition-all"
-                >
-                  {companies.map((c) => {
-                    let badge = '';
-                    if (c.is_demo) badge = ' 💡 [Demo Sample]';
-                    else if (c.is_partner_store) badge = ' 🌐 [Partner Store]';
-                    else if ((c.status || '').toLowerCase() === 'watching') badge = ' ⭐ [Watching]';
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {c.company_name}{badge}
-                      </option>
-                    );
-                  })}
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
-            </div>
-          )}
-        </div>
+        {activeTab === 'demographic' && <DemographicTab />}
+
+        {activeTab === 'opportunity' && (
+          <OpportunityTab
+            companies={companies}
+            generalVisitors={combinedGeneralVisitors}
+            allHits={allHits}
+            opportunityUrl={opportunityUrl}
+            opportunityDuration={opportunityDuration}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+            onSelectCompany={(id) => setSelectedCompanyId(id)}
+          />
+        )}
+
+        {activeTab === 'slipped' && <SlippedTab />}
+
+        {activeTab === 'settings' && (
+          <SettingsTab
+            wpSettings={wpSettings}
+            opportunityUrl={opportunityUrl}
+            opportunityDuration={opportunityDuration}
+            slippedEnabled={slippedEnabled}
+            slippedWindow={slippedWindow}
+            trackingEnabled={trackingEnabled}
+            onSaveOpportunitySettings={handleSaveOpportunitySettings}
+            onSaveSlippedSettings={handleSaveSlippedSettings}
+            onSaveApiEndpoint={handleSaveApiEndpoint}
+            onToggleTracking={handleToggleTracking}
+          />
+        )}
       </div>
-
-      {/* Main Row: Store Detail (Left) + Page Visits (Right) SIDE-BY-SIDE IN SAME ROW */}
-      {activeFilter !== 'GENERAL' ? (
-        selectedCompany ? (
-          <div className="space-y-4">
-            {/* Top Summary Metrics: B2B Identified Companies */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    Identified Companies
-                  </span>
-                  <span className="text-xl font-black text-slate-900 font-mono">
-                    {companies.length}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    Corporate Page Hits
-                  </span>
-                  <span className="text-xl font-black text-slate-900 font-mono">
-                    {companies.reduce((acc, c) => acc + (c.total_page_views || c.page_visits?.length || 1), 0)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    Total Corporate Dwell
-                  </span>
-                  <span className="text-xl font-black text-slate-900 font-mono">
-                    {formatDuration(
-                      companies.reduce(
-                        (acc, c) =>
-                          acc +
-                          (c.page_visits?.reduce((hAcc, h) => hAcc + (parseInt(h.duration) || 60), 0) || 120),
-                        0
-                      )
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                  <Zap className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                    High Intent Leads
-                  </span>
-                  <span className="text-xl font-black text-slate-900 font-mono">
-                    {companies.filter((c) => c.status === 'watching' || c.is_partner_store || (c.page_visits && c.page_visits.length > 1)).length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Two-Column Row */}
-            <div className="flex flex-row gap-6 items-stretch w-full overflow-x-auto pb-4">
-              {/* =================================================================== */}
-              {/* LEFT COLUMN: STORE / COMPANY DETAIL CARD                            */}
-              {/* =================================================================== */}
-              <div className="w-[380px] lg:w-[420px] shrink-0 flex flex-col">
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-                  {/* Header: Company Name & Action Tags */}
-                  <div className="p-6 border-b border-slate-100 shrink-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight leading-snug">
-                          {selectedCompany.company_name}
-                        </h2>
-                        <p className="text-xs text-slate-500 font-medium mt-1">
-                          {selectedCompany.industry}
-                        </p>
-                      </div>
-                      <div
-                        className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-sm shrink-0 ${selectedCompany.logo_bg}`}
-                      >
-                        {selectedCompany.initials}
-                      </div>
-                    </div>
-
-                    {/* Status Badges - Placed on the same row */}
-                    <div className="flex items-center gap-1.5 mt-3.5 flex-nowrap overflow-x-auto">
-                      {selectedCompany.is_demo && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs shrink-0 whitespace-nowrap">
-                          <Sparkles className="w-3 h-3 text-amber-600" />
-                          Demo Sample
-                        </span>
-                      )}
-                      {selectedCompany.status === 'watching' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs shrink-0 whitespace-nowrap">
-                          <Eye className="w-3 h-3 text-amber-600" />
-                          Watching
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs shrink-0 whitespace-nowrap">
-                        <Building2 className="w-3 h-3 text-blue-600" />
-                        Company
-                      </span>
-                      {selectedCompany.is_partner_store && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs shrink-0 whitespace-nowrap" title="Verified merchant on our B2B partner network">
-                          <Globe className="w-3 h-3 text-emerald-600" />
-                          Network Partner Store
-                        </span>
-                      )}
-                      {selectedCompany.is_demo && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDemoIp(selectedCompany.activation_ip, selectedCompany.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 shadow-2xs shrink-0 whitespace-nowrap transition-all ml-auto"
-                          title="Delete this demo IP"
-                        >
-                          <Trash2 className="w-3 h-3 text-red-500" />
-                          <span>Delete Demo IP</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Physical Office Address & Details (Full Display - No Scrollbar) */}
-                  <div className="p-6 space-y-4 flex-1">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                        Physical Office Address
-                      </span>
-                      <p className="text-xs font-semibold text-slate-800 mt-1.5 leading-relaxed">
-                        {selectedCompany.physical_address}
-                      </p>
-                    </div>
-
-                    {/* Contact Information */}
-                    <div className="space-y-2.5 pt-2 border-t border-slate-100/80">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-blue-500" />
-                          Corporate IP
-                        </span>
-                        <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                          {selectedCompany.activation_ip || selectedCompany.page_visits?.[0]?.visitor_ip || 'Corporate Subnet'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          Telephone
-                        </span>
-                        <span className="font-mono font-semibold text-slate-700">
-                          {selectedCompany.telephone}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          Official Email
-                        </span>
-                        {selectedCompany.official_email !== '--' ? (
-                          <a
-                            href={`mailto:${selectedCompany.official_email}`}
-                            className="font-medium text-blue-600 hover:underline max-w-[200px] truncate"
-                          >
-                            {selectedCompany.official_email}
-                          </a>
-                        ) : (
-                          <span className="text-slate-400">--</span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-slate-400" />
-                          Corporate Domain
-                        </span>
-                        {selectedCompany.website !== '#' ? (
-                          <a
-                            href={selectedCompany.website}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium text-blue-600 hover:underline flex items-center gap-1"
-                          >
-                            {selectedCompany.website.replace(/^https?:\/\//, '')}
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : (
-                          <span className="text-slate-400">--</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Social Media Links */}
-                    <div className="pt-2 border-t border-slate-100/80">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                        Social Verification
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {selectedCompany.linkedin_url ? (
-                          <a
-                            href={selectedCompany.linkedin_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center gap-1.5 transition-colors border border-blue-200/60"
-                          >
-                            <span>LinkedIn Profile</span>
-                            <ArrowUpRight className="w-3 h-3" />
-                          </a>
-                        ) : null}
-
-                        {selectedCompany.twitter_url ? (
-                          <a
-                            href={selectedCompany.twitter_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 flex items-center gap-1.5 transition-colors border border-sky-200/60"
-                          >
-                            <span>X / Twitter</span>
-                            <ArrowUpRight className="w-3 h-3" />
-                          </a>
-                        ) : null}
-
-                        {!selectedCompany.linkedin_url && !selectedCompany.twitter_url && (
-                          <span className="text-xs text-slate-400 italic">No social profiles attached</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Traffic Source & Intent */}
-                    <div className="pt-2 border-t border-slate-100/80">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                        Acquisition Channel
-                      </span>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-700 font-semibold flex items-center gap-1.5">
-                          <Compass className="w-3.5 h-3.5 text-blue-500" />
-                          {selectedCompany.acquisition_channel}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 font-mono">
-                          {selectedCompany.acquisition_badge}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* =================================================================== */}
-              {/* RIGHT COLUMN: RECENT PAGE VISITS (Fixed Height & Inner Scroll)      */}
-              {/* =================================================================== */}
-              <div className="flex-1 min-w-[540px] h-[520px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                  <div>
-                    <h3 className="font-black text-slate-900 text-base">
-                      Browsing Journey & Page Hits
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Pages visited by employees from <strong className="text-slate-800">{selectedCompany.company_name}</strong>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1.5">
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>{selectedCompany.page_visits?.length || 0} Total Page Hits</span>
-                    </span>
-                    <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{selectedCompany.time_on_site} Total Dwell</span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* Inner Scrollable Table */}
-                <div className="flex-1 overflow-y-auto overflow-x-auto svt-custom-scrollbar">
-                  <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
-                      <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-200">
-                        <th className="py-3 px-4 bg-slate-50">Status</th>
-                        <th className="py-3 px-4 bg-slate-50">Date & Time</th>
-                        <th className="py-3 px-4 bg-slate-50">Dwell Time</th>
-                        <th className="py-3 px-4 bg-slate-50">Page Visited</th>
-                        <th className="py-3 px-4 bg-slate-50">Device & Screen</th>
-                        <th className="py-3 px-4 bg-slate-50">Referrer</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {(selectedCompany.page_visits || []).map((hit, idx) => (
-                        <tr key={hit.id || idx} className="hover:bg-slate-50/80 transition-colors border-b border-slate-200">
-                          <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                              Active Hit
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-slate-600 whitespace-nowrap">
-                            {hit.date_time}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                            {hit.duration}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-mono text-blue-700 font-semibold max-w-[220px] truncate block" title={hit.page_url}>
-                              {hit.page_url}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                            <div className="font-semibold text-slate-800">{hit.browser}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{hit.screen_res}</div>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 text-[11px] max-w-[180px] truncate" title={hit.referrer}>
-                            {hit.referrer && hit.referrer.startsWith('http') ? (
-                              <a
-                                href={hit.referrer}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="hover:underline text-slate-600"
-                              >
-                                {hit.referrer.replace(/^https?:\/\//, '')}
-                              </a>
-                            ) : (
-                              <span>{hit.referrer}</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-            <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-800">No Identified Companies Yet</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-              When corporate visitors browse your store, their company details and page visits will appear here automatically in real time.
-            </p>
-            <button
-              type="button"
-              onClick={handleRestoreDemo}
-              className="mt-4 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all inline-flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>Preview Sample Demo Data</span>
-            </button>
-          </div>
-        )
-      ) : (
-        /* =================================================================== */
-        /* GENERAL & RESIDENTIAL WEBSITE TRAFFIC VIEW                          */
-        /* =================================================================== */
-        <div className="space-y-6">
-          {/* Top Summary Metrics: Total Visitors, Total Page Views, Avg Session, Repeat Engagement */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                <Users className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                  Total Website Visitors
-                </span>
-                <span className="text-xl font-black text-slate-900 font-mono">
-                  {groupedGeneralVisitors.length}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                <Eye className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                  Total Page Views
-                </span>
-                <span className="text-xl font-black text-slate-900 font-mono">
-                  {combinedGeneralVisitors.length}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                  Avg Session Duration
-                </span>
-                <span className="text-xl font-black text-slate-900 font-mono">
-                  {formatDuration(
-                    groupedGeneralVisitors.length > 0
-                      ? Math.round(
-                          combinedGeneralVisitors.reduce((acc, h) => acc + (h.duration_seconds || 60), 0) /
-                            groupedGeneralVisitors.length
-                        )
-                      : 120
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                <Wifi className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
-                  Repeat Website Hits
-                </span>
-                <span className="text-xl font-black text-slate-900 font-mono">
-                  {groupedGeneralVisitors.filter((v) => v.total_hits > 1).length}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {groupedGeneralVisitors.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-slate-800">No General Visitors Recorded Yet</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Non-corporate website traffic from residential broadband and mobile networks will be listed here.
-              </p>
-              <button
-                type="button"
-                onClick={handleRestoreDemo}
-                className="mt-4 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all inline-flex items-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Preview Sample Demo Visitors</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-row gap-6 items-stretch w-full overflow-x-auto pb-4">
-              {/* LEFT COLUMN: Ranked Website Visitors (Highest Hits First, Scrollable) */}
-              <div className="w-[380px] lg:w-[420px] shrink-0 h-[460px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Website Visitor IP Feeds</h3>
-                    <p className="text-[11px] text-slate-500">Ranked by highest hit frequency</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    {groupedGeneralVisitors.length} Unique IPs
-                  </span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 svt-custom-scrollbar">
-                  {groupedGeneralVisitors.map((visitor, index) => {
-                    const isSelected = activeGeneralVisitor && activeGeneralVisitor.ip === visitor.ip;
-                    const isTopHit = index === 0;
-
-                    return (
-                      <div
-                        key={visitor.ip}
-                        onClick={() => setSelectedGeneralIp(visitor.ip)}
-                        className={`p-3.5 cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-indigo-50/90 border-l-4 border-indigo-600 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50/80 border-l-4 border-transparent'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {visitor.is_demo && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                                DEMO
-                              </span>
-                            )}
-                            {isTopHit ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-400 text-amber-950 flex items-center gap-1 shadow-2xs">
-                                <Flame className="w-3 h-3 fill-amber-950" />
-                                #1 Top
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 font-mono">
-                                #{index + 1}
-                              </span>
-                            )}
-                            <span className="font-mono text-xs font-bold text-slate-900">
-                              {visitor.ip}
-                            </span>
-                          </div>
-
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[11px] font-black font-mono ${
-                              visitor.total_hits > 1
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {visitor.total_hits} {visitor.total_hits === 1 ? 'Hit' : 'Hits'}
-                          </span>
-                        </div>
-
-                        <div className="text-[11px] text-slate-500 flex items-center justify-between gap-2 mt-2 pt-1.5 border-t border-slate-100">
-                          <span className="flex items-center gap-1 text-slate-600">
-                            <Wifi className="w-3 h-3 text-slate-400" />
-                            Broadband Subnet
-                          </span>
-                          <span className="font-mono font-semibold text-slate-700">
-                            ⏱ {formatDuration(visitor.total_dwell_seconds)}
-                          </span>
-                        </div>
-
-                        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
-                          <span>{visitor.browser} • {visitor.screen_res}</span>
-                          <span>{formatHitTime(visitor.latest_visit).split(' - ')[1] || 'Recent'}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN: Selected IP Page Visits History (Equal Height & Inner Scroll) */}
-              {activeGeneralVisitor && (
-                <div className="flex-1 min-w-[540px] h-[460px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                  {/* Header */}
-                  <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                        <h3 className="font-black text-slate-900 text-base">
-                          Visit Journey for <code className="font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">{activeGeneralVisitor.ip}</code>
-                        </h3>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Detailed session timeline and journey across your store for this visitor IP.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {activeGeneralVisitor.is_demo && (
-                        <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1.5 rounded-xl border border-amber-300 flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Demo Visitor</span>
-                        </span>
-                      )}
-                      {activeGeneralVisitor.is_demo && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDemoIp(activeGeneralVisitor.ip, activeGeneralVisitor.ip)}
-                          className="text-xs font-bold bg-white hover:bg-red-50 text-red-600 px-3 py-1.5 rounded-xl border border-red-200 shadow-2xs transition-all flex items-center gap-1.5"
-                          title="Delete this demo visitor IP"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                          <span>Delete Demo IP</span>
-                        </button>
-                      )}
-                      <span className="text-xs font-mono font-bold bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1.5">
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>{activeGeneralVisitor.total_hits} Total Hits</span>
-                      </span>
-                      <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{formatDuration(activeGeneralVisitor.total_dwell_seconds)} Dwell</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Visit History Table: Inner Scrollable */}
-                  <div className="flex-1 overflow-y-auto overflow-x-auto svt-custom-scrollbar">
-                    <table className="w-full text-left text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
-                        <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-200">
-                          <th className="py-3 px-4 bg-slate-50">Status & Intent</th>
-                          <th className="py-3 px-4 bg-slate-50">Date & Time</th>
-                          <th className="py-3 px-4 bg-slate-50">Duration</th>
-                          <th className="py-3 px-4 bg-slate-50">Page Visited</th>
-                          <th className="py-3 px-4 bg-slate-50">Device & Screen</th>
-                          <th className="py-3 px-4 bg-slate-50">Referrer Source</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {activeGeneralVisitor.hits.map((hit, i) => {
-                          const isHighIntent = (hit.duration_seconds || 60) > 120 || activeGeneralVisitor.total_hits >= 3;
-                          return (
-                            <tr key={hit.id || i} className="hover:bg-slate-50/80 transition-colors border-b border-slate-200">
-                              <td className="py-3.5 px-4">
-                                {isHighIntent ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                    <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                    High Engagement
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                    <Clock className="w-3 h-3 text-slate-400" />
-                                    Standard Browsing
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 font-mono text-slate-600 whitespace-nowrap">
-                                {formatHitTime(hit.visited_at)}
-                              </td>
-                              <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                                {formatDuration(hit.duration_seconds || 60)}
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span className="font-mono text-indigo-700 font-semibold max-w-[200px] truncate block" title={hit.page_url}>
-                                   {hit.page_url || '/'}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                                <div className="font-semibold text-slate-800">{hit.browser || 'Chrome'}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">{hit.screen_res || '1920x1080'}</div>
-                              </td>
-                              <td className="py-3.5 px-4 text-slate-600 text-[11px] max-w-[180px] truncate" title={hit.referrer}>
-                                {hit.referrer || 'Direct Navigation'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
-  );
-}
-
-// Helpers
-function formatDuration(seconds) {
-  if (!seconds) return '00:01:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}:00`;
-}
-
-function formatHitTime(isoString) {
-  if (!isoString) return 'Just now';
-  const d = new Date(isoString);
-  return (
-    d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) +
-    ' - ' +
-    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
   );
 }
