@@ -504,16 +504,6 @@ export default function MerchantDashboard() {
     setAllDemoDismissed(true);
   };
 
-  const navTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'traffic', label: 'Traffic', icon: Globe },
-    { id: 'firmographic', label: 'Firmographic', icon: Building2 },
-    { id: 'demographic', label: 'Demographic', icon: Users },
-    { id: 'opportunity', label: 'Opportunity', icon: Zap },
-    { id: 'slipped', label: 'Slipped', icon: ShoppingBag },
-    { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
-  ];
-
   return (
     <div className="w-full max-w-full overflow-x-hidden bg-[#f4f6f9] text-slate-800 antialiased min-h-screen p-3 sm:p-5 font-sans">
       {/* Top Header Bar */}
@@ -561,28 +551,6 @@ export default function MerchantDashboard() {
             <span>Refresh</span>
           </button>
         </div>
-      </div>
-
-      {/* Multi-Page Navigation Tabs */}
-      <div className="mb-5 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-2xs flex flex-wrap items-center gap-1">
-        {navTabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabSwitch(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-              }`}
-            >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
       </div>
 
       {/* Explicit Consent Notice Banner (WordPress Guideline 7) */}

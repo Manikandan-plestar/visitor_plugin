@@ -9,20 +9,9 @@ import {
   Eye,
   ExternalLink,
   ChevronRight,
-  ChevronLeft,
   Search,
-  Filter,
-  Monitor,
-  Smartphone,
-  Laptop,
-  Check,
-  Zap,
   Sparkles,
-  Flame,
-  Trash2,
-  Layers,
-  ArrowUpRight,
-  SlidersHorizontal,
+  ArrowLeft,
 } from 'lucide-react';
 
 export default function FirmographicTab({
@@ -32,10 +21,12 @@ export default function FirmographicTab({
   onDeleteDemoCompany,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedViewMode, setSelectedViewMode] = useState('split'); // 'split' | 'table-only' | 'detail-only'
+  const [viewingCompanyId, setViewingCompanyId] = useState(null);
 
-  // Selected company object
-  const activeCompany = companies.find((c) => String(c.id) === String(selectedCompanyId)) || companies[0] || null;
+  // Selected company object for detail inspection
+  const activeCompany = viewingCompanyId
+    ? companies.find((c) => String(c.id) === String(viewingCompanyId)) || null
+    : null;
 
   // Filter companies by search query
   const filteredCompanies = companies.filter((c) => {
@@ -49,146 +40,52 @@ export default function FirmographicTab({
     );
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-600" />
-              Corporate Firmographic Intelligence
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Identified B2B corporate organizations, reverse-IP registries, and employee page journeys.
-            </p>
+  const handleSelectCompany = (id) => {
+    setViewingCompanyId(id);
+    if (onSelectCompany) {
+      onSelectCompany(id);
+    }
+  };
+
+  const handleBackToTable = () => {
+    setViewingCompanyId(null);
+  };
+
+  // --------------------------------------------------------------------------
+  // Detail View: When a particular company is selected, hide table and show details
+  // --------------------------------------------------------------------------
+  if (activeCompany) {
+    return (
+      <div className="space-y-6">
+        {/* Back Navigation Bar */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handleBackToTable}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer group w-fit"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
+            <span>Back to Companies Table</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500">Corporate Subnet:</span>
+            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
+              {activeCompany.activation_ip}
+            </span>
           </div>
-
-          <div className="flex items-center gap-2.5">
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search identified companies..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Master Firmographic Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            All Identified Companies ({filteredCompanies.length})
-          </span>
-          <span className="text-xs text-slate-400">
-            Click any row to inspect deep company firmographics & hit journeys
-          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4 w-12 text-center">S.No</th>
-                <th className="py-3 px-4">IP Address</th>
-                <th className="py-3 px-4">Company Name</th>
-                <th className="py-3 px-4 text-center">Total Hits</th>
-                <th className="py-3 px-4 text-center">Duration</th>
-                <th className="py-3 px-4">Industry Vertical</th>
-                <th className="py-3 px-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredCompanies.map((c, idx) => {
-                const isSelected = activeCompany && String(activeCompany.id) === String(c.id);
-                return (
-                  <tr
-                    key={c.id}
-                    onClick={() => onSelectCompany(c.id)}
-                    className={`transition-colors cursor-pointer ${
-                      isSelected ? 'bg-blue-50/70 border-l-4 border-l-blue-600' : 'hover:bg-slate-50/80'
-                    }`}
-                  >
-                    {/* S.No */}
-                    <td className="py-3.5 px-4 text-center font-mono text-slate-400 font-semibold">
-                      {idx + 1}
-                    </td>
-
-                    {/* IP Address */}
-                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                      {c.activation_ip}
-                    </td>
-
-                    {/* Company Name */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${c.logo_bg}`}>
-                          {c.initials}
-                        </div>
-                        <div>
-                          <span className={`font-bold block ${isSelected ? 'text-blue-700' : 'text-slate-900'}`}>
-                            {c.company_name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block truncate max-w-[200px]">
-                            {c.website?.replace(/^https?:\/\//, '')}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Total Hits */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 font-mono font-bold">
-                        {c.page_visits?.length || c.total_page_views || 1}
-                      </span>
-                    </td>
-
-                    {/* Total Duration */}
-                    <td className="py-3.5 px-4 text-center font-mono text-emerald-700 font-semibold">
-                      {c.time_on_site}
-                    </td>
-
-                    {/* Industry */}
-                    <td className="py-3.5 px-4 text-slate-600">
-                      <span className="truncate block max-w-[200px]">{c.industry}</span>
-                    </td>
-
-                    {/* Action */}
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectCompany(c.id);
-                        }}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600'
-                        }`}
-                      >
-                        {isSelected ? 'Viewing' : 'Inspect'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Selected Company Inspector (The 2-Column Inspector: Left = Company Info, Right = Hit Journey) */}
-      {activeCompany && (
+        {/* Selected Company Inspector (2-Column Inspector: Left = Company Info, Right = Hit Journey) */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-6 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-sm shrink-0 ${activeCompany.logo_bg}`}>
-                {activeCompany.initials}
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-sm shrink-0 ${
+                  activeCompany.logo_bg || 'bg-blue-600'
+                }`}
+              >
+                {activeCompany.initials || 'CO'}
               </div>
               <div>
                 <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -209,9 +106,9 @@ export default function FirmographicTab({
             </div>
 
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500">Corporate Subnet:</span>
-              <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
-                {activeCompany.activation_ip}
+              <span className="text-slate-500">Total Visits:</span>
+              <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-md">
+                {activeCompany.total_visits || activeCompany.page_visits?.length || 1}
               </span>
             </div>
           </div>
@@ -246,7 +143,7 @@ export default function FirmographicTab({
                   <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                   <div>
                     <span className="text-slate-500 block text-[11px]">Corporate Contact Email</span>
-                    {activeCompany.official_email !== '--' ? (
+                    {activeCompany.official_email && activeCompany.official_email !== '--' ? (
                       <a href={`mailto:${activeCompany.official_email}`} className="font-semibold text-blue-600 hover:underline">
                         {activeCompany.official_email}
                       </a>
@@ -261,8 +158,13 @@ export default function FirmographicTab({
                   <Globe className="w-4 h-4 text-slate-400 shrink-0" />
                   <div>
                     <span className="text-slate-500 block text-[11px]">Primary Domain</span>
-                    {activeCompany.website !== '#' ? (
-                      <a href={activeCompany.website} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                    {activeCompany.website && activeCompany.website !== '#' ? (
+                      <a
+                        href={activeCompany.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                      >
                         {activeCompany.website.replace(/^https?:\/\//, '')}
                         <ExternalLink className="w-3 h-3" />
                       </a>
@@ -329,8 +231,150 @@ export default function FirmographicTab({
             </div>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Master Table View: Displayed when no specific company is selected
+  // --------------------------------------------------------------------------
+  return (
+    <div className="space-y-6">
+      {/* Header & Controls */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-600" />
+              Corporate Firmographic Intelligence
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Identified B2B corporate organizations, reverse-IP registries, and employee page journeys.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search identified companies..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Master Firmographic Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            All Identified Companies ({filteredCompanies.length})
+          </span>
+          <span className="text-xs text-slate-400">
+            Click any row or action icon to view company details
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-4 w-12 text-center">S.No</th>
+                <th className="py-3 px-4">IP Address</th>
+                <th className="py-3 px-4">Company Name</th>
+                <th className="py-3 px-4 text-center">Total Hits</th>
+                <th className="py-3 px-4 text-center">Duration</th>
+                <th className="py-3 px-4">Industry Vertical</th>
+                <th className="py-3 px-4 text-center w-20">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredCompanies.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-slate-400">
+                    No identified companies found matching &quot;{searchQuery}&quot;.
+                  </td>
+                </tr>
+              ) : (
+                filteredCompanies.map((c, idx) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => handleSelectCompany(c.id)}
+                    className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
+                  >
+                    {/* S.No */}
+                    <td className="py-3.5 px-4 text-center font-mono text-slate-400 font-semibold">
+                      {idx + 1}
+                    </td>
+
+                    {/* IP Address */}
+                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
+                      {c.activation_ip}
+                    </td>
+
+                    {/* Company Name */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${
+                            c.logo_bg || 'bg-blue-600'
+                          }`}
+                        >
+                          {c.initials || 'CO'}
+                        </div>
+                        <div>
+                          <span className="font-bold block text-slate-900 group-hover:text-blue-600 transition-colors">
+                            {c.company_name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate max-w-[200px]">
+                            {c.website?.replace(/^https?:\/\//, '')}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Total Hits */}
+                    <td className="py-3.5 px-4 text-center">
+                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 font-mono font-bold">
+                        {c.page_visits?.length || c.total_page_views || 1}
+                      </span>
+                    </td>
+
+                    {/* Total Duration */}
+                    <td className="py-3.5 px-4 text-center font-mono text-emerald-700 font-semibold">
+                      {c.time_on_site}
+                    </td>
+
+                    {/* Industry */}
+                    <td className="py-3.5 px-4 text-slate-600">
+                      <span className="truncate block max-w-[200px]">{c.industry}</span>
+                    </td>
+
+                    {/* Action Icon */}
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectCompany(c.id);
+                        }}
+                        title={`View ${c.company_name} details`}
+                        className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white transition-all inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
-
