@@ -155,6 +155,8 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
     id: 'demo_gen_1',
     is_demo: true,
     visitor_ip: '98.142.204.11',
+    city: 'Chicago',
+    country: 'United States',
     page_url: '/shop/smart-sensor',
     referrer: 'https://www.google.com/search?q=smart+sensor+store',
     screen_res: '1920x1080',
@@ -166,6 +168,8 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
     id: 'demo_gen_2',
     is_demo: true,
     visitor_ip: '98.142.204.11',
+    city: 'Chicago',
+    country: 'United States',
     page_url: '/cart',
     referrer: 'Direct Navigation',
     screen_res: '1920x1080',
@@ -177,6 +181,8 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
     id: 'demo_gen_3',
     is_demo: true,
     visitor_ip: '157.240.241.35',
+    city: 'Menlo Park',
+    country: 'United States',
     page_url: '/blog/b2b-analytics-guide',
     referrer: 'https://facebook.com',
     screen_res: '390x844',
@@ -188,6 +194,8 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
     id: 'demo_gen_4',
     is_demo: true,
     visitor_ip: '104.244.42.1',
+    city: 'San Francisco',
+    country: 'United States',
     page_url: '/pricing',
     referrer: 'https://x.com/amazer_analytics',
     screen_res: '1920x1080',
@@ -199,6 +207,8 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
     id: 'demo_gen_5',
     is_demo: true,
     visitor_ip: '108.177.15.10',
+    city: 'Mountain View',
+    country: 'United States',
     page_url: '/products',
     referrer: 'Direct Navigation',
     screen_res: '1440x900',
@@ -336,6 +346,16 @@ export default function MerchantDashboard() {
     setLoading(true);
     setErrorMsg(null);
     try {
+      // Flush any locally queued 5-minute batch hits immediately so latest telemetry appears
+      if (wpSettings.ajaxUrl && wpSettings.nonce) {
+        try {
+          const form = new FormData();
+          form.append('action', 'amazer_via_flush_batch');
+          form.append('nonce', wpSettings.nonce);
+          await fetch(wpSettings.ajaxUrl, { method: 'POST', body: form });
+        } catch (e) {}
+      }
+
       const url = `${wpSettings.apiUrl.replace(/\/+$/, '')}/api/v1/analytics/visitor-detail?storeUrl=${encodeURIComponent(
         wpSettings.storeUrl
       )}`;

@@ -64,10 +64,169 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'amazer_via_ad
 
 /**
  * ----------------------------------------------------------------------------
+ * 5-Minute Batch Sync Cron & Local Queue (Reduces API Requests & Server Cost)
+ * ----------------------------------------------------------------------------
+ * Storefront visits are logged locally in WordPress with zero external network latency.
+ * Every 5 minutes, WordPress flushes queued visits in ONE single consolidated batch to the DB.
+ */
+function amazer_via_add_five_minute_cron_interval( $schedules ) {
+    $schedules['five_minutes'] = array(
+        'interval' => 300, // 300 seconds = 5 minutes
+        'display'  => __( 'Every 5 Minutes', 'amazer-visitor-intelligence' ),
+    );
+    return $schedules;
+}
+add_filter( 'cron_schedules', 'amazer_via_add_five_minute_cron_interval' );
+
+function amazer_via_schedule_batch_sync() {
+    if ( ! wp_next_scheduled( 'amazer_via_five_minute_batch_sync' ) ) {
+        wp_schedule_event( time(), 'five_minutes', 'amazer_via_five_minute_batch_sync' );
+    }
+}
+add_action( 'init', 'amazer_via_schedule_batch_sync' );
+
+/**
+ * Register local REST route for lightweight storefront telemetry logging.
+ * Logs hits locally without firing an external cloud API call on every page view.
+ */
+function amazer_via_register_local_log_route() {
+    register_rest_route( 'amazer-via/v1', '/log', array(
+        'methods'             => 'POST',
+        'callback'            => 'amazer_via_handle_local_log',
+        'permission_callback' => '__return_true',
+    ) );
+}
+add_action( 'rest_api_init', 'amazer_via_register_local_log_route' );
+
+function amazer_via_handle_local_log( WP_REST_Request $request ) {
+    if ( 'yes' !== get_option( 'amazer_via_tracking_enabled', 'no' ) ) {
+        return new WP_REST_Response( array( 'status' => 'skipped_consent' ), 200 );
+    }
+
+    $params = $request->get_json_params();
+    if ( empty( $params ) ) {
+        $params = $request->get_body_params();
+    }
+
+    $visitor_ip = '';
+    if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+        $visitor_ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+    } elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+        $parts = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
+        $visitor_ip = trim( $parts[0] );
+    } elseif ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+        $visitor_ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+    }
+
+    $hit = array(
+        'visitor_ip'       => $visitor_ip,
+        'visitor_id'       => sanitize_text_field( $params['visitor_id'] ?? '' ),
+        'page_url'         => esc_url_raw( $params['page_url'] ?? '/' ),
+        'page_title'       => sanitize_text_field( $params['page_title'] ?? '' ),
+        'referrer'         => sanitize_text_field( $params['referrer'] ?? 'Direct Navigation' ),
+        'screen_res'       => sanitize_text_field( $params['screen_res'] ?? '1920x1080' ),
+        'browser'          => sanitize_text_field( $params['browser'] ?? 'Chrome' ),
+        'duration_seconds' => intval( $params['duration_seconds'] ?? 60 ),
+        'visited_at'       => gmdate( 'c' ),
+    );
+
+    $upload_dir = wp_upload_dir();
+    $log_dir    = $upload_dir['basedir'] . '/amazer_telemetry';
+    if ( ! file_exists( $log_dir ) ) {
+        wp_mkdir_p( $log_dir );
+        @file_put_contents( $log_dir . '/index.html', '' );
+        @file_put_contents( $log_dir . '/.htaccess', 'Deny from all' );
+    }
+
+    $log_file = $log_dir . '/pending_hits.log';
+    @file_put_contents( $log_file, wp_json_encode( $hit ) . "\n", FILE_APPEND | LOCK_EX );
+
+    return new WP_REST_Response( array( 'success' => true, 'queued' => true ), 200 );
+}
+
+/**
+ * Flush all pending local hits in ONE single batch API request to the central DB
+ */
+function amazer_via_flush_pending_hits() {
+    $upload_dir = wp_upload_dir();
+    $log_file   = $upload_dir['basedir'] . '/amazer_telemetry/pending_hits.log';
+    $sync_file  = $upload_dir['basedir'] . '/amazer_telemetry/syncing_hits.log';
+
+    if ( ! file_exists( $log_file ) || filesize( $log_file ) === 0 ) {
+        return 0;
+    }
+
+    @rename( $log_file, $sync_file );
+    if ( ! file_exists( $sync_file ) ) {
+        return 0;
+    }
+
+    $content = @file_get_contents( $sync_file );
+    if ( empty( $content ) ) {
+        @unlink( $sync_file );
+        return 0;
+    }
+
+    $lines = explode( "\n", trim( $content ) );
+    $hits  = array();
+    foreach ( $lines as $line ) {
+        if ( ! empty( $line ) ) {
+            $data = json_decode( $line, true );
+            if ( $data ) {
+                $hits[] = $data;
+            }
+        }
+    }
+
+    if ( empty( $hits ) ) {
+        @unlink( $sync_file );
+        return 0;
+    }
+
+    $batch_endpoint = trailingslashit( amazer_via_get_api_url() ) . 'api/v1/track/batch';
+    $payload = array(
+        'target_store' => esc_url_raw( get_site_url() ),
+        'hits'         => $hits,
+    );
+
+    $response = wp_remote_post( $batch_endpoint, array(
+        'method'      => 'POST',
+        'timeout'     => 15,
+        'redirection' => 2,
+        'headers'     => array( 'Content-Type' => 'application/json' ),
+        'body'        => wp_json_encode( $payload ),
+    ) );
+
+    if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
+        @unlink( $sync_file );
+        return count( $hits );
+    } else {
+        // Network/server temporarily down; restore unsynced hits back into pending log
+        @file_put_contents( $log_file, $content, FILE_APPEND | LOCK_EX );
+        @unlink( $sync_file );
+        return 0;
+    }
+}
+add_action( 'amazer_via_five_minute_batch_sync', 'amazer_via_flush_pending_hits' );
+
+/**
+ * On-demand flush AJAX handler for instant dashboard refresh
+ */
+function amazer_via_ajax_flush_batch() {
+    check_ajax_referer( 'amazer_via_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+    $count = amazer_via_flush_pending_hits();
+    wp_send_json_success( array( 'synced_count' => (int) $count ) );
+}
+add_action( 'wp_ajax_amazer_via_flush_batch', 'amazer_via_ajax_flush_batch' );
+
+/**
+ * ----------------------------------------------------------------------------
  * Storefront Telemetry Tracker (wp_enqueue_scripts)
  * ----------------------------------------------------------------------------
- * Sends lightweight, non-blocking beacon directly to central API endpoint.
- * Fully compliant with WordPress.org guidelines: no unauthenticated DB writes or REST endpoints.
+ * Buffers telemetry locally in WordPress; flushes to central DB every 5 minutes.
  */
 function amazer_via_enqueue_storefront_tracker() {
     // Strictly skip admin, cron, ajax, or REST calls
@@ -86,6 +245,7 @@ function amazer_via_enqueue_storefront_tracker() {
         return;
     }
 
+    $local_endpoint  = esc_url_raw( rest_url( 'amazer-via/v1/log' ) );
     $remote_endpoint = trailingslashit( amazer_via_get_api_url() ) . 'api/v1/track';
     $store_url       = esc_url_raw( get_site_url() );
 
@@ -127,6 +287,7 @@ function amazer_via_enqueue_storefront_tracker() {
                 timestamp: new Date().toISOString()
             };
 
+            var localUrl = " . wp_json_encode( $local_endpoint ) . ";
             var remoteUrl = " . wp_json_encode( $remote_endpoint ) . ";
             var dataStr = JSON.stringify(payload);
             var sent = false;
@@ -134,19 +295,23 @@ function amazer_via_enqueue_storefront_tracker() {
             if (typeof navigator.sendBeacon === 'function') {
                 try {
                     var blob = new Blob([dataStr], { type: 'application/json' });
-                    sent = navigator.sendBeacon(remoteUrl, blob);
+                    sent = navigator.sendBeacon(localUrl, blob);
                 } catch (err) {
                     sent = false;
                 }
             }
 
             if (!sent && typeof fetch === 'function') {
-                fetch(remoteUrl, {
+                fetch(localUrl, {
                     method: 'POST',
                     keepalive: true,
                     headers: { 'Content-Type': 'application/json' },
                     body: dataStr
-                }).catch(function() {});
+                }).catch(function() {
+                    if (typeof navigator.sendBeacon === 'function') {
+                        navigator.sendBeacon(remoteUrl, new Blob([dataStr], { type: 'application/json' }));
+                    }
+                });
             }
 
             var sendDwellBeacon = function() {
@@ -161,7 +326,7 @@ function amazer_via_enqueue_storefront_tracker() {
                 });
                 if (typeof navigator.sendBeacon === 'function') {
                     try {
-                        navigator.sendBeacon(remoteUrl, new Blob([dwellPayload], { type: 'application/json' }));
+                        navigator.sendBeacon(localUrl, new Blob([dwellPayload], { type: 'application/json' }));
                     } catch (e) {}
                 }
             };
@@ -387,6 +552,8 @@ add_action( 'wp_ajax_amazer_via_save_slipped_settings', 'amazer_via_ajax_save_sl
  * Render the React Dashboard Root Container
  */
 function amazer_via_render_dashboard_container() {
+    // Flush any pending 5-minute queue hits immediately so the merchant sees up-to-the-minute data
+    amazer_via_flush_pending_hits();
     $bundle_js = AMAZER_VIA_PLUGIN_DIR . 'dist/bundle.js';
     ?>
     <div class="wrap amazer-via-admin-wrap" style="margin: 0; padding: 0;">

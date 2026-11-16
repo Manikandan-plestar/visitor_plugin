@@ -18,6 +18,7 @@ import {
   Sparkles,
   Compass,
   Share2,
+  MapPin,
 } from 'lucide-react';
 
 /**
@@ -25,7 +26,6 @@ import {
  * Identifies Direct, Search Engines (Google, Bing), Social Networks (Facebook, LinkedIn, Twitter, Instagram), or External Referrals.
  */
 export function parseTrafficSource(referrer, channel) {
-  // 1. If explicit acquisition channel from company intelligence is available
   if (channel && channel !== 'Direct Navigation' && channel !== '--' && channel !== '#') {
     const ch = channel.toLowerCase();
     if (ch.includes('google')) {
@@ -46,7 +46,6 @@ export function parseTrafficSource(referrer, channel) {
     return { type: 'referral', label: channel, category: 'Referral' };
   }
 
-  // 2. Direct visits (no referrer or explicit Direct Navigation)
   if (
     !referrer ||
     referrer === 'Direct Navigation' ||
@@ -90,7 +89,6 @@ export function parseTrafficSource(referrer, channel) {
       return { type: 'reddit', label: 'Reddit', category: 'Social' };
     }
 
-    // Generic external referrer domain
     let domain = referrer;
     if (referrer.startsWith('http://') || referrer.startsWith('https://')) {
       domain = new URL(referrer).hostname.replace(/^www\./, '');
@@ -99,6 +97,75 @@ export function parseTrafficSource(referrer, channel) {
   } catch (e) {
     return { type: 'referral', label: 'Referral', category: 'Referral' };
   }
+}
+
+/**
+ * Intelligent IP Geolocation & Country Flag Classifier
+ */
+export function getIpLocation(record) {
+  if (record.country || record.city) {
+    const parts = [record.city, record.country].filter(Boolean);
+    const country = record.country || '';
+    let flag = '🌐';
+    if (country.includes('Germany')) flag = '🇩🇪';
+    else if (country.includes('United Kingdom') || country.includes('UK')) flag = '🇬🇧';
+    else if (country.includes('United States') || country.includes('USA')) flag = '🇺🇸';
+    else if (country.includes('India')) flag = '🇮🇳';
+    else if (country.includes('France')) flag = '🇫🇷';
+    else if (country.includes('Canada')) flag = '🇨🇦';
+    else if (country.includes('Australia')) flag = '🇦🇺';
+    return {
+      text: parts.join(', '),
+      flag,
+      country,
+      city: record.city || '',
+    };
+  }
+
+  // From corporate physical address
+  if (record.physicalAddress && record.physicalAddress !== 'Address pending enrichment') {
+    const addr = record.physicalAddress;
+    if (addr.includes('Germany')) {
+      return { text: 'Munich, Germany', flag: '🇩🇪', country: 'Germany', city: 'Munich' };
+    }
+    if (addr.includes('UK') || addr.includes('United Kingdom') || addr.includes('Berkshire') || addr.includes('Wigan')) {
+      return { text: 'England, UK', flag: '🇬🇧', country: 'United Kingdom', city: 'England' };
+    }
+    if (
+      addr.includes('USA') ||
+      addr.includes('United States') ||
+      addr.includes('San Jose') ||
+      addr.includes('Denver') ||
+      addr.includes('CA') ||
+      addr.includes('CO')
+    ) {
+      return { text: 'United States', flag: '🇺🇸', country: 'United States', city: '' };
+    }
+    if (addr.includes('India')) {
+      return { text: 'India', flag: '🇮🇳', country: 'India', city: '' };
+    }
+  }
+
+  // From IP network prefix
+  const ip = record.ip || '';
+  if (ip.startsWith('194.') || ip.startsWith('80.')) {
+    return { text: 'Munich, Germany', flag: '🇩🇪', country: 'Germany', city: 'Munich' };
+  }
+  if (ip.startsWith('212.') || ip.startsWith('195.')) {
+    return { text: 'London, UK', flag: '🇬🇧', country: 'United Kingdom', city: 'London' };
+  }
+  if (
+    ip.startsWith('98.') ||
+    ip.startsWith('157.') ||
+    ip.startsWith('104.') ||
+    ip.startsWith('108.') ||
+    ip.startsWith('173.') ||
+    ip.startsWith('73.')
+  ) {
+    return { text: 'United States', flag: '🇺🇸', country: 'United States', city: '' };
+  }
+
+  return { text: 'Global Network', flag: '🌐', country: 'Global', city: '' };
 }
 
 /**
@@ -154,6 +221,7 @@ export default function TrafficTab({
             companyName: comp.company_name,
             companyId: comp.id,
             industry: comp.industry,
+            physicalAddress: comp.physical_address,
             logoBg: comp.logo_bg,
             initials: comp.initials,
             totalHits: 0,
@@ -166,10 +234,11 @@ export default function TrafficTab({
             referrer: hit.referrer || 'Direct Navigation',
             acquisitionChannel: comp.acquisition_channel,
             totalVisits: comp.total_visits || 1,
+            city: comp.city || '',
+            country: comp.country || '',
           });
         }
         const record = ipMap.get(ip);
-        // Total Hits: count every hit (including multiple visits to the same page)
         record.totalHits += 1;
         record.totalDuration += parseInt(hit.duration, 10) || 60;
         if (hit.page_url) record.pagesVisited.add(hit.page_url);
@@ -197,6 +266,7 @@ export default function TrafficTab({
           companyName: 'General Consumer / ISP',
           companyId: null,
           industry: 'Residential ISP',
+          physicalAddress: gen.physical_address || '',
           logoBg: 'bg-slate-500',
           initials: 'IP',
           totalHits: 0,
@@ -209,10 +279,11 @@ export default function TrafficTab({
           referrer: gen.referrer || 'Direct Navigation',
           acquisitionChannel: null,
           totalVisits: 1,
+          city: gen.city || '',
+          country: gen.country || '',
         });
       }
       const record = ipMap.get(ip);
-      // Total Hits: count every view
       record.totalHits += 1;
       record.totalDuration += gen.duration_seconds || 60;
       if (gen.page_url) record.pagesVisited.add(gen.page_url);
@@ -231,12 +302,13 @@ export default function TrafficTab({
     return Array.from(ipMap.values()).map((record) => {
       const isReturning = record.totalHits > 1 || (record.totalVisits && record.totalVisits > 1);
       const sourceInfo = parseTrafficSource(record.referrer, record.acquisitionChannel);
+      const locationInfo = getIpLocation(record);
       return {
         ...record,
-        // Unique pages visited across the site (e.g. 2 pages)
         uniquePagesCount: record.pagesVisited.size || 1,
         isReturning,
         sourceInfo,
+        locationInfo,
       };
     });
   }, [companies, generalVisitors]);
@@ -254,8 +326,9 @@ export default function TrafficTab({
         const matchIp = item.ip.toLowerCase().includes(q);
         const matchComp = (item.companyName || '').toLowerCase().includes(q);
         const matchSource = (item.sourceInfo?.label || '').toLowerCase().includes(q);
+        const matchLocation = (item.locationInfo?.text || '').toLowerCase().includes(q);
         const matchBrowser = (item.browser || '').toLowerCase().includes(q);
-        if (!matchIp && !matchComp && !matchSource && !matchBrowser) return false;
+        if (!matchIp && !matchComp && !matchSource && !matchLocation && !matchBrowser) return false;
       }
       return true;
     });
@@ -371,7 +444,7 @@ export default function TrafficTab({
               Storefront Visitor Traffic Log
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Live tracking log of visitor IPs, new vs. returning status, total hit counts, page visits, and traffic sources.
+              Live tracking log of visitor IPs, geographic location, new vs. returning status, total hits, and page views.
             </p>
           </div>
 
@@ -438,7 +511,7 @@ export default function TrafficTab({
               type="text"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              placeholder="Search by IP, Company, Source, or Browser..."
+              placeholder="Search by IP, Location, Company, or Source..."
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
             />
           </div>
@@ -475,6 +548,7 @@ export default function TrafficTab({
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                 <th className="py-3.5 px-4 w-12 text-center">S.No</th>
                 <th className="py-3.5 px-4">IP Address</th>
+                <th className="py-3.5 px-4">Location</th>
                 <th className="py-3.5 px-4 text-center">Visitor Type</th>
                 <th className="py-3.5 px-4">Entity / Network</th>
                 <th className="py-3.5 px-4 text-center">Total Hits</th>
@@ -488,7 +562,7 @@ export default function TrafficTab({
             <tbody className="divide-y divide-slate-100">
               {paginatedTraffic.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="py-12 text-center text-slate-400">
+                  <td colSpan="11" className="py-12 text-center text-slate-400">
                     No visitor records found matching your filters.
                   </td>
                 </tr>
@@ -523,6 +597,18 @@ export default function TrafficTab({
                               <Copy className="w-3.5 h-3.5" />
                             )}
                           </button>
+                        </div>
+                      </td>
+
+                      {/* Location: Flag + City / Country */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-base leading-none shrink-0" title={row.locationInfo.country || 'Location'}>
+                            {row.locationInfo.flag}
+                          </span>
+                          <span className="font-medium text-slate-800 truncate max-w-[140px]">
+                            {row.locationInfo.text}
+                          </span>
                         </div>
                       </td>
 
@@ -575,11 +661,11 @@ export default function TrafficTab({
                         )}
                       </td>
 
-                      {/* Total Hits (Counts repeated views of same page) */}
+                      {/* Total Hits */}
                       <td className="py-3.5 px-4 text-center">
                         <span
                           className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-mono font-bold text-xs inline-flex items-center gap-1"
-                          title={`Total page view hits: ${row.totalHits} (including repeated views of the same page)`}
+                          title={`Total page view hits: ${row.totalHits} (including repeated views of same page)`}
                         >
                           <span>{row.totalHits}</span>
                           <span className="text-[10px] text-slate-500 font-normal">
@@ -588,7 +674,7 @@ export default function TrafficTab({
                         </span>
                       </td>
 
-                      {/* Page Visits (Unique pages visited across site) */}
+                      {/* Page Visits */}
                       <td className="py-3.5 px-4 text-center">
                         <span
                           className="px-2.5 py-0.5 rounded-lg bg-blue-50/80 text-blue-800 border border-blue-200/80 font-mono font-semibold text-xs inline-flex items-center gap-1"
