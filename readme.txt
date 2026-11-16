@@ -1,4 +1,4 @@
-=== Amazer VI Analytics ===
+=== Amazer Visitor Intelligence ===
 Contributors: amazerinc, amazerplugins
 Tags: amazer analytics, visitor intelligence, whois analytics, visitor tracking, b2b intelligence
 Requires at least: 5.8
@@ -12,13 +12,13 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal v
 
 == Description ==
 
-**Amazer VI Analytics** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
+**Amazer Visitor Intelligence** empowers WooCommerce and WordPress merchants to identify the businesses, corporate organizations, and leads visiting their website in real time — even if they never submit a contact form or make an inquiry.
 
 ### Key Capabilities:
 * **Real-Time Reverse-IP Intelligence**: Automatically identifies corporate visitor networks, company names, industry, and corporate headquarters.
 * **Corporate IP & Telemetry**: Inspect individual company activation IPs, duration on site, and specific browsed URLs.
 * **Dual Intelligence View**: Toggle between *All Identified* corporate prospects and *General Visitors* with deep hit journeys.
-* **Zero-Friction Activation**: No manual tracking scripts or complex tag managers required. Activating the plugin immediately enables storefront telemetry.
+* **Explicit Opt-in Consent**: Full compliance with privacy standards and WordPress Guideline 7. Enable or disable storefront telemetry anytime from the dashboard.
 * **High-Intent Lead Scoring**: Automatically highlights visitors showing commercial intent (browsing pricing, product specs, or checkout pages).
 
 ### 3rd Party Service Disclosure
@@ -42,15 +42,15 @@ To build or compile the JavaScript bundle from source:
 
 == Installation ==
 
-1. Upload the plugin folder `amazer-whois-analytics` to `/wp-content/plugins/` directory, or upload the `amazer-whois-analytics.zip` archive via **Plugins > Add New > Upload Plugin**.
+1. Upload the plugin folder `amazer-visitor-intelligence` to `/wp-content/plugins/` directory, or upload the `amazer-visitor-intelligence.zip` archive via **Plugins > Add New > Upload Plugin**.
 2. Activate the plugin through the **Plugins** menu in WordPress.
-3. Access the intelligence portal under **Amazer VI Analytics** in your WordPress admin menu.
+3. Access the intelligence portal under **Amazer Visitor Intelligence** in your WordPress admin menu.
 4. In compliance with WordPress privacy guidelines, click "Enable Visitor Tracking" in the dashboard to grant explicit consent and start capturing visitor intelligence.
 
 == Frequently Asked Questions ==
 
 = Does this plugin track visitors automatically upon activation? =
-No. In strict compliance with WordPress.org Guideline 7, storefront telemetry remains completely disabled upon activation. The site administrator must grant explicit consent by clicking "Enable Visitor Tracking" in the Amazer VI Analytics dashboard before any telemetry is dispatched to the central service.
+No. In strict compliance with WordPress.org Guideline 7, storefront telemetry remains completely disabled upon activation. The site administrator must grant explicit consent by clicking "Enable Visitor Tracking" in the Amazer Visitor Intelligence dashboard before any telemetry is dispatched to the central service.
 
 = Does this plugin slow down my store? =
 No. Visitor telemetry is dispatched asynchronously using the browser's native `navigator.sendBeacon` API. If `sendBeacon` is unsupported, it falls back to a non-blocking background fetch call that never impedes page render time or customer experience.
