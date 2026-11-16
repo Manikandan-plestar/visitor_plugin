@@ -191,6 +191,29 @@ function amazer_via_register_admin_dashboard_menu() {
         'dashicons-visibility',
         30
     );
+
+    // Submenus displayed when clicking or hovering Amazer Visitor Intelligence
+    $submenus = array(
+        'dashboard'    => __( 'Dashboard', 'amazer-visitor-intelligence' ),
+        'traffic'      => __( 'Traffic', 'amazer-visitor-intelligence' ),
+        'firmographic' => __( 'Firmographic', 'amazer-visitor-intelligence' ),
+        'demographic'  => __( 'Demographic', 'amazer-visitor-intelligence' ),
+        'opportunity'  => __( 'Opportunity', 'amazer-visitor-intelligence' ),
+        'slipped'      => __( 'Slipped', 'amazer-visitor-intelligence' ),
+        'settings'     => __( 'Settings', 'amazer-visitor-intelligence' ),
+    );
+
+    foreach ( $submenus as $tab_slug => $tab_title ) {
+        $page_slug = ( 'dashboard' === $tab_slug ) ? 'amazer-visitor-intelligence' : 'amazer-visitor-intelligence-' . $tab_slug;
+        add_submenu_page(
+            'amazer-visitor-intelligence',
+            $tab_title . ' &lsaquo; ' . __( 'Amazer Visitor Intelligence', 'amazer-visitor-intelligence' ),
+            $tab_title,
+            'manage_options',
+            $page_slug,
+            'amazer_via_render_dashboard_container'
+        );
+    }
 }
 add_action( 'admin_menu', 'amazer_via_register_admin_dashboard_menu' );
 
@@ -200,6 +223,21 @@ add_action( 'admin_menu', 'amazer_via_register_admin_dashboard_menu' );
 function amazer_via_enqueue_admin_assets( $hook_suffix ) {
     if ( strpos( (string) $hook_suffix, 'amazer-visitor-intelligence' ) === false ) {
         return;
+    }
+
+    $initial_tab = 'dashboard';
+    if ( strpos( (string) $hook_suffix, 'traffic' ) !== false ) {
+        $initial_tab = 'traffic';
+    } elseif ( strpos( (string) $hook_suffix, 'firmographic' ) !== false ) {
+        $initial_tab = 'firmographic';
+    } elseif ( strpos( (string) $hook_suffix, 'demographic' ) !== false ) {
+        $initial_tab = 'demographic';
+    } elseif ( strpos( (string) $hook_suffix, 'opportunity' ) !== false ) {
+        $initial_tab = 'opportunity';
+    } elseif ( strpos( (string) $hook_suffix, 'slipped' ) !== false ) {
+        $initial_tab = 'slipped';
+    } elseif ( strpos( (string) $hook_suffix, 'settings' ) !== false ) {
+        $initial_tab = 'settings';
     }
 
     $bundle_js      = AMAZER_VIA_PLUGIN_DIR . 'dist/bundle.js';
@@ -225,6 +263,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
         );
 
         wp_localize_script( 'amazer-via-bundle-js', 'amazerViSettings', array(
+            'initialTab'          => $initial_tab,
             'storeUrl'            => esc_url( get_site_url() ),
             'apiUrl'              => amazer_via_get_api_url(),
             'siteName'            => get_bloginfo( 'name' ),

@@ -204,8 +204,57 @@ export default function MerchantDashboard() {
     slippedWindow: '48h',
   };
 
+  // Helper to determine initial tab from URL or localized settings
+  const getInitialTab = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const page = params.get('page') || '';
+      if (page.includes('traffic')) return 'traffic';
+      if (page.includes('firmographic')) return 'firmographic';
+      if (page.includes('demographic')) return 'demographic';
+      if (page.includes('opportunity')) return 'opportunity';
+      if (page.includes('slipped')) return 'slipped';
+      if (page.includes('settings')) return 'settings';
+    } catch (e) {}
+    return wpSettings.initialTab || 'dashboard';
+  };
+
   // Active Multi-Page Route Tab
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'traffic' | 'firmographic' | 'demographic' | 'opportunity' | 'slipped' | 'settings'
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
+  // Synchronize Tab Switching with Browser History & WordPress Sidebar
+  const handleTabSwitch = (tabId) => {
+    setActiveTab(tabId);
+    try {
+      const pageSlug = tabId === 'dashboard' ? 'amazer-visitor-intelligence' : `amazer-visitor-intelligence-${tabId}`;
+      const newUrl = `admin.php?page=${pageSlug}`;
+      window.history.pushState({ tab: tabId }, '', newUrl);
+
+      // Highlight active item in WordPress left sidebar submenu
+      const wpMenu = document.querySelector('li.toplevel_page_amazer-visitor-intelligence');
+      if (wpMenu) {
+        wpMenu.querySelectorAll('.wp-submenu li').forEach((li) => {
+          const a = li.querySelector('a');
+          if (a && a.getAttribute('href') && a.getAttribute('href').includes(pageSlug)) {
+            li.classList.add('current');
+            a.classList.add('current');
+          } else {
+            li.classList.remove('current');
+            if (a) a.classList.remove('current');
+          }
+        });
+      }
+    } catch (e) {}
+  };
+
+  // Listen for browser back / forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTab(getInitialTab());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Data States
   const [liveCompanies, setLiveCompanies] = useState([]);
@@ -466,7 +515,7 @@ export default function MerchantDashboard() {
   ];
 
   return (
-    <div className="w-full bg-[#f4f6f9] text-slate-800 antialiased min-h-screen p-4 sm:p-5 font-sans">
+    <div className="w-full max-w-full overflow-x-hidden bg-[#f4f6f9] text-slate-800 antialiased min-h-screen p-3 sm:p-5 font-sans">
       {/* Top Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-3 border-b border-slate-200 gap-3">
         <div>
@@ -522,7 +571,7 @@ export default function MerchantDashboard() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabSwitch(tab.id)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-xs'
@@ -588,7 +637,7 @@ export default function MerchantDashboard() {
       )}
 
       {/* Multi-Page Route Render */}
-      <div>
+      <div className="w-full max-w-full overflow-hidden">
         {activeTab === 'dashboard' && (
           <DashboardTab
             companies={companies}
@@ -600,7 +649,7 @@ export default function MerchantDashboard() {
               ).length
             }
             onSelectCompany={(id) => setSelectedCompanyId(id)}
-            onNavigateTab={(tab) => setActiveTab(tab)}
+            onNavigateTab={(tab) => handleTabSwitch(tab)}
           />
         )}
 
@@ -610,7 +659,7 @@ export default function MerchantDashboard() {
             generalVisitors={combinedGeneralVisitors}
             allHits={allHits}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
-            onNavigateTab={(tab) => setActiveTab(tab)}
+            onNavigateTab={(tab) => handleTabSwitch(tab)}
           />
         )}
 
@@ -631,7 +680,7 @@ export default function MerchantDashboard() {
             allHits={allHits}
             opportunityUrl={opportunityUrl}
             opportunityDuration={opportunityDuration}
-            onNavigateTab={(tab) => setActiveTab(tab)}
+            onNavigateTab={(tab) => handleTabSwitch(tab)}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
           />
         )}

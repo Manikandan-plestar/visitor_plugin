@@ -28,7 +28,7 @@ export default function DashboardTab({
   onSelectCompany,
   onNavigateTab,
 }) {
-  const [timeRange, setTimeRange] = useState('14d'); // '7d' | '14d' | '30d'
+  const [timeRange, setTimeRange] = useState('14d');
 
   // Calculate high-level KPIs
   const totalIdentifiedCompanies = companies.length;
@@ -80,7 +80,7 @@ export default function DashboardTab({
     }));
   }, [companies]);
 
-  // Traffic Trendline Data (Simulated daily distribution based on hit timestamps)
+  // Traffic Trendline Data
   const trafficDays = useMemo(() => {
     const days = 14;
     const result = [];
@@ -88,10 +88,8 @@ export default function DashboardTab({
     for (let i = days - 1; i >= 0; i--) {
       const dayDate = new Date(now - i * 86400000);
       const label = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      // Count hits on this day
       const dayStr = dayDate.toISOString().slice(0, 10);
       const dayHits = allHits.filter((h) => (h.visited_at || '').startsWith(dayStr)).length;
-      // Add baseline for visual polish if historical DB is sparse
       const count = dayHits > 0 ? dayHits : Math.max(1, ((i * 3 + 2) % 7) + 2);
       result.push({ label, count, date: dayStr });
     }
@@ -106,14 +104,14 @@ export default function DashboardTab({
   }, [companies]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-hidden">
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
         {/* Card 1 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Identified Companies</span>
-            <span className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Identified Companies</span>
+            <span className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
               <Building2 className="w-5 h-5" />
             </span>
           </div>
@@ -123,46 +121,46 @@ export default function DashboardTab({
               <TrendingUp className="w-3 h-3" /> +100%
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Real-time corporate reverse-IP matches</p>
+          <p className="text-xs text-slate-500 mt-1 truncate">Real-time corporate reverse-IP matches</p>
         </div>
 
         {/* Card 2 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Page Hits</span>
-            <span className="p-2.5 rounded-xl bg-purple-50 text-purple-600">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Total Page Hits</span>
+            <span className="p-2.5 rounded-xl bg-purple-50 text-purple-600 shrink-0">
               <Eye className="w-5 h-5" />
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">{totalPageHits}</span>
-            <span className="text-xs text-slate-500 font-medium">({totalCorporateHits} corporate)</span>
+            <span className="text-xs text-slate-500 font-medium truncate">({totalCorporateHits} corporate)</span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Aggregate storefront page requests</p>
+          <p className="text-xs text-slate-500 mt-1 truncate">Aggregate storefront page requests</p>
         </div>
 
         {/* Card 3 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">High Intent Opportunities</span>
-            <span className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">High Intent Leads</span>
+            <span className="p-2.5 rounded-xl bg-amber-50 text-amber-600 shrink-0">
               <Zap className="w-5 h-5" />
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">{opportunityCount}</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
               Target URLs
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Visitors exceeding dwell thresholds</p>
+          <p className="text-xs text-slate-500 mt-1 truncate">Visitors exceeding dwell thresholds</p>
         </div>
 
         {/* Card 4 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Average Dwell Time</span>
-            <span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Average Dwell Time</span>
+            <span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
               <Clock className="w-5 h-5" />
             </span>
           </div>
@@ -170,14 +168,14 @@ export default function DashboardTab({
             <span className="text-3xl font-black text-slate-900">{formatSeconds(avgDwellSeconds)}</span>
             <span className="text-xs text-slate-500 font-medium">per hit</span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Engagement on storefront pages</p>
+          <p className="text-xs text-slate-500 mt-1 truncate">Engagement on storefront pages</p>
         </div>
       </div>
 
       {/* Main Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
         {/* Traffic Trend Chart (Takes 2 Columns) */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs">
+        <div className="lg:col-span-2 min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -186,31 +184,31 @@ export default function DashboardTab({
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">Daily visitor hit volume over the past 14 days</p>
             </div>
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start sm:self-auto">
               <span className="px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs">14 Days</span>
               <span className="px-2.5 py-1 text-slate-500">Live Telemetry</span>
             </div>
           </div>
 
           {/* SVG Bar / Area Visualization */}
-          <div className="mt-6">
-            <div className="h-56 flex items-end justify-between gap-1.5 sm:gap-2.5 pt-6 pb-2">
+          <div className="mt-6 w-full overflow-hidden">
+            <div className="h-56 flex items-end justify-between gap-1 sm:gap-2 pt-6 pb-2 w-full">
               {trafficDays.map((day, idx) => {
                 const heightPct = Math.max(12, Math.round((day.count / maxDailyCount) * 100));
                 return (
-                  <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group">
+                  <div key={idx} className="flex-1 min-w-0 flex flex-col items-center h-full justify-end group relative">
                     {/* Tooltip on hover */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2 px-2 py-1 bg-slate-900 text-white text-[10px] rounded-md font-mono whitespace-nowrap pointer-events-none shadow-md z-10">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 px-2 py-1 bg-slate-900 text-white text-[10px] rounded-md font-mono whitespace-nowrap pointer-events-none shadow-md z-20">
                       {day.count} hits • {day.label}
                     </div>
                     {/* Bar Column */}
-                    <div className="w-full max-w-[28px] bg-slate-100 rounded-t-lg overflow-hidden flex flex-col justify-end h-full">
+                    <div className="w-full max-w-[24px] bg-slate-100 rounded-t-lg overflow-hidden flex flex-col justify-end h-full">
                       <div
                         style={{ height: `${heightPct}%` }}
                         className="w-full bg-gradient-to-t from-blue-600 to-indigo-500 rounded-t-lg transition-all duration-500 group-hover:from-blue-500 group-hover:to-indigo-400"
                       ></div>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono mt-2 truncate max-w-[36px] text-center">
+                    <span className="text-[10px] text-slate-400 font-mono mt-2 truncate w-full text-center">
                       {day.label.split(' ')[1]}
                     </span>
                   </div>
@@ -227,7 +225,7 @@ export default function DashboardTab({
         </div>
 
         {/* Acquisition Channels (1 Column) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between">
+        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs flex flex-col justify-between overflow-hidden">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -243,11 +241,11 @@ export default function DashboardTab({
                 return (
                   <div key={idx} className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700 flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${colors[idx % colors.length]}`}></span>
-                        {item.name}
+                      <span className="font-semibold text-slate-700 flex items-center gap-2 truncate">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colors[idx % colors.length]}`}></span>
+                        <span className="truncate">{item.name}</span>
                       </span>
-                      <span className="font-mono text-slate-600">{item.count} ({item.pct}%)</span>
+                      <span className="font-mono text-slate-600 shrink-0">{item.count} ({item.pct}%)</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                       <div
@@ -269,9 +267,9 @@ export default function DashboardTab({
       </div>
 
       {/* Second Row: Top Visited Pages & Recent Companies */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
         {/* Top Pages */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs">
+        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Layers className="w-4 h-4 text-indigo-600" />
@@ -279,7 +277,7 @@ export default function DashboardTab({
             </h3>
             <button
               onClick={() => onNavigateTab('traffic')}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer shrink-0"
             >
               View Full Traffic <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -290,11 +288,11 @@ export default function DashboardTab({
               const pct = Math.round((page.count / maxPageCount) * 100);
               return (
                 <div key={idx} className="p-3 bg-slate-50/70 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors">
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="font-mono font-semibold text-slate-800 truncate max-w-[280px]">
+                  <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
+                    <span className="font-mono font-semibold text-slate-800 truncate flex-1 min-w-0">
                       {page.url}
                     </span>
-                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md font-mono text-slate-700 font-bold">
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md font-mono text-slate-700 font-bold shrink-0">
                       {page.count} hits
                     </span>
                   </div>
@@ -308,7 +306,7 @@ export default function DashboardTab({
         </div>
 
         {/* Recent Companies Feed */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs">
+        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-blue-600" />
@@ -316,7 +314,7 @@ export default function DashboardTab({
             </h3>
             <button
               onClick={() => onNavigateTab('firmographic')}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer shrink-0"
             >
               All Companies <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -330,20 +328,20 @@ export default function DashboardTab({
                   if (onSelectCompany) onSelectCompany(comp.id);
                   onNavigateTab('firmographic');
                 }}
-                className="py-3 flex items-center justify-between hover:bg-slate-50/70 rounded-xl px-2 transition-colors cursor-pointer group"
+                className="py-3 flex items-center justify-between hover:bg-slate-50/70 rounded-xl px-2 transition-colors cursor-pointer group gap-2"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${comp.logo_bg}`}>
                     {comp.initials}
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
                       {comp.company_name}
                     </h4>
-                    <p className="text-[11px] text-slate-500">{comp.industry}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{comp.industry}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span className="text-xs font-mono font-semibold text-slate-700 block">
                     {comp.page_visits?.length || 1} hits
                   </span>
