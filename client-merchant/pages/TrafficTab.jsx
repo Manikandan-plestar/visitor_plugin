@@ -118,7 +118,6 @@ function formatDateWithoutTime(val) {
   } catch (e) {}
 
   if (typeof val === 'string') {
-    // Strip any leading time like "10:30 AM Nov 16" or "10:30:00 Nov 16, 2026"
     const cleaned = val.replace(/^\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*,?\s*/i, '').trim();
     return cleaned || val;
   }
@@ -134,7 +133,7 @@ export default function TrafficTab({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'NEW' | 'RETURNING' | 'CORPORATE' | 'CONSUMER'
-  const [sortField, setSortField] = useState('hits'); // 'hits' | 'duration' | 'ip' | 'date'
+  const [sortField, setSortField] = useState('hits'); // 'hits' | 'unique_pages' | 'duration' | 'ip' | 'date'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -170,6 +169,7 @@ export default function TrafficTab({
           });
         }
         const record = ipMap.get(ip);
+        // Total Hits: count every hit (including multiple visits to the same page)
         record.totalHits += 1;
         record.totalDuration += parseInt(hit.duration, 10) || 60;
         if (hit.page_url) record.pagesVisited.add(hit.page_url);
@@ -212,6 +212,7 @@ export default function TrafficTab({
         });
       }
       const record = ipMap.get(ip);
+      // Total Hits: count every view
       record.totalHits += 1;
       record.totalDuration += gen.duration_seconds || 60;
       if (gen.page_url) record.pagesVisited.add(gen.page_url);
@@ -232,7 +233,7 @@ export default function TrafficTab({
       const sourceInfo = parseTrafficSource(record.referrer, record.acquisitionChannel);
       return {
         ...record,
-        pagesVisitCount: record.totalHits,
+        // Unique pages visited across the site (e.g. 2 pages)
         uniquePagesCount: record.pagesVisited.size || 1,
         isReturning,
         sourceInfo,
@@ -243,13 +244,11 @@ export default function TrafficTab({
   // Filter & Search
   const filteredTraffic = useMemo(() => {
     return aggregatedTraffic.filter((item) => {
-      // Filter Type: ALL | NEW | RETURNING | CORPORATE | CONSUMER
       if (filterType === 'NEW' && item.isReturning) return false;
       if (filterType === 'RETURNING' && !item.isReturning) return false;
       if (filterType === 'CORPORATE' && !item.isCorporate) return false;
       if (filterType === 'CONSUMER' && item.isCorporate) return false;
 
-      // Search query across IP, Company, Source, Page, Browser
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchIp = item.ip.toLowerCase().includes(q);
@@ -266,9 +265,12 @@ export default function TrafficTab({
   const sortedTraffic = useMemo(() => {
     const list = [...filteredTraffic];
     list.sort((a, b) => {
-      let valA = a.pagesVisitCount;
-      let valB = b.pagesVisitCount;
-      if (sortField === 'duration') {
+      let valA = a.totalHits;
+      let valB = b.totalHits;
+      if (sortField === 'unique_pages') {
+        valA = a.uniquePagesCount;
+        valB = b.uniquePagesCount;
+      } else if (sortField === 'duration') {
         valA = a.totalDuration;
         valB = b.totalDuration;
       } else if (sortField === 'date') {
@@ -301,7 +303,6 @@ export default function TrafficTab({
     setTimeout(() => setCopiedIp(null), 2000);
   };
 
-  // Helper to render Source Badge
   const renderSourceBadge = (source) => {
     switch (source.type) {
       case 'direct':
@@ -370,7 +371,7 @@ export default function TrafficTab({
               Storefront Visitor Traffic Log
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Live tracking log of incoming visitor IPs, new vs. returning status, page view counts, dwell duration, and traffic sources.
+              Live tracking log of visitor IPs, new vs. returning status, total hit counts, page visits, and traffic sources.
             </p>
           </div>
 
@@ -449,7 +450,8 @@ export default function TrafficTab({
               onChange={(e) => setSortField(e.target.value)}
               className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
             >
-              <option value="hits">Highest Page Visits</option>
+              <option value="hits">Highest Total Hits</option>
+              <option value="unique_pages">Most Pages Visited</option>
               <option value="duration">Longest Dwell Duration</option>
               <option value="date">Date</option>
               <option value="ip">IP Address</option>
@@ -475,7 +477,8 @@ export default function TrafficTab({
                 <th className="py-3.5 px-4">IP Address</th>
                 <th className="py-3.5 px-4 text-center">Visitor Type</th>
                 <th className="py-3.5 px-4">Entity / Network</th>
-                <th className="py-3.5 px-4 text-center">Pages Visit Count</th>
+                <th className="py-3.5 px-4 text-center">Total Hits</th>
+                <th className="py-3.5 px-4 text-center">Page Visits</th>
                 <th className="py-3.5 px-4 text-center">Duration</th>
                 <th className="py-3.5 px-4">Traffic Source</th>
                 <th className="py-3.5 px-4">Browser & Device</th>
@@ -485,7 +488,7 @@ export default function TrafficTab({
             <tbody className="divide-y divide-slate-100">
               {paginatedTraffic.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400">
+                  <td colSpan="10" className="py-12 text-center text-slate-400">
                     No visitor records found matching your filters.
                   </td>
                 </tr>
@@ -572,15 +575,28 @@ export default function TrafficTab({
                         )}
                       </td>
 
-                      {/* Pages Visit Count */}
+                      {/* Total Hits (Counts repeated views of same page) */}
                       <td className="py-3.5 px-4 text-center">
                         <span
                           className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-mono font-bold text-xs inline-flex items-center gap-1"
-                          title={`Visited pages: ${Array.from(row.pagesVisited).join(', ') || '/'}`}
+                          title={`Total page view hits: ${row.totalHits} (including repeated views of the same page)`}
                         >
-                          <span>{row.pagesVisitCount}</span>
+                          <span>{row.totalHits}</span>
                           <span className="text-[10px] text-slate-500 font-normal">
-                            {row.pagesVisitCount === 1 ? 'page' : 'pages'}
+                            {row.totalHits === 1 ? 'hit' : 'hits'}
+                          </span>
+                        </span>
+                      </td>
+
+                      {/* Page Visits (Unique pages visited across site) */}
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className="px-2.5 py-0.5 rounded-lg bg-blue-50/80 text-blue-800 border border-blue-200/80 font-mono font-semibold text-xs inline-flex items-center gap-1"
+                          title={`Distinct pages visited: ${Array.from(row.pagesVisited).join(', ') || '/'}`}
+                        >
+                          <span>{row.uniquePagesCount}</span>
+                          <span className="text-[10px] text-blue-600 font-normal">
+                            {row.uniquePagesCount === 1 ? 'page' : 'pages'}
                           </span>
                         </span>
                       </td>
