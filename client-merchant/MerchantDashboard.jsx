@@ -13,13 +13,16 @@ import {
   Check,
   Trash2,
   Sparkles,
+  Target,
 } from 'lucide-react';
 
 import DashboardTab from './pages/DashboardTab';
 import TrafficTab from './pages/TrafficTab';
 import FirmographicTab from './pages/FirmographicTab';
 import DemographicTab from './pages/DemographicTab';
+import HighIntentTab from './pages/HighIntentTab';
 import OpportunityTab from './pages/OpportunityTab';
+import ConversionTab from './pages/ConversionTab';
 import SlippedTab from './pages/SlippedTab';
 import SettingsTab from './pages/SettingsTab';
 
@@ -231,7 +234,9 @@ export default function MerchantDashboard() {
     nonce: '',
     trackingEnabled: 'no',
     opportunityUrl: '/pricing',
+    highIntentUrls: '/pricing, /product/industrial-turbine-sensor, /checkout, /four-plans, /contact-sales',
     opportunityDuration: 60,
+    conversionUrls: '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout',
     slippedEnabled: 'yes',
     slippedWindow: '48h',
   };
@@ -243,12 +248,14 @@ export default function MerchantDashboard() {
       const page = params.get('page') || '';
       if (page.includes('traffic')) return 'traffic';
       if (page.includes('firmographic')) return 'firmographic';
+      if (page.includes('high_intent') || page.includes('opportunity')) return 'high_intent';
+      if (page.includes('conversion')) return 'conversion';
       if (page.includes('demographic')) return 'demographic';
-      if (page.includes('opportunity')) return 'opportunity';
       if (page.includes('slipped')) return 'slipped';
       if (page.includes('settings')) return 'settings';
     } catch (e) {}
-    return wpSettings.initialTab || 'dashboard';
+    const init = wpSettings.initialTab || 'dashboard';
+    return init === 'opportunity' ? 'high_intent' : init;
   };
 
   // Active Multi-Page Route Tab
@@ -319,7 +326,13 @@ export default function MerchantDashboard() {
   const [trackingEnabled, setTrackingEnabled] = useState(wpSettings.trackingEnabled === 'yes');
   const [togglingTracking, setTogglingTracking] = useState(false);
   const [opportunityUrl, setOpportunityUrl] = useState(wpSettings.opportunityUrl || '/pricing');
+  const [highIntentUrls, setHighIntentUrls] = useState(
+    wpSettings.highIntentUrls || '/pricing, /product/industrial-turbine-sensor, /checkout, /four-plans, /contact-sales'
+  );
   const [opportunityDuration, setOpportunityDuration] = useState(wpSettings.opportunityDuration || 60);
+  const [conversionUrls, setConversionUrls] = useState(
+    wpSettings.conversionUrls || '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout'
+  );
   const [slippedEnabled, setSlippedEnabled] = useState(wpSettings.slippedEnabled !== 'no');
   const [slippedWindow, setSlippedWindow] = useState(wpSettings.slippedWindow || '48h');
 
@@ -644,6 +657,74 @@ export default function MerchantDashboard() {
         </div>
       )}
 
+      {/* Primary 5-Section Navigation Menu */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 w-fit max-w-full overflow-x-auto shadow-2xs mb-6">
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('dashboard')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'dashboard'
+              ? 'bg-white text-blue-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span>Dashboard</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('traffic')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'traffic'
+              ? 'bg-white text-blue-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Traffic</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('firmographic')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'firmographic'
+              ? 'bg-white text-blue-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Firmography</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('high_intent')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'high_intent' || activeTab === 'opportunity'
+              ? 'bg-white text-blue-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+          <span>High_Intent</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('conversion')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'conversion'
+              ? 'bg-white text-rose-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Target className="w-4 h-4 text-rose-600" />
+          <span>Conversion</span>
+        </button>
+      </div>
+
       {/* Multi-Page Route Render */}
       <div className="w-full max-w-full overflow-hidden">
         {activeTab === 'dashboard' && (
@@ -651,11 +732,9 @@ export default function MerchantDashboard() {
             companies={companies}
             generalVisitors={combinedGeneralVisitors}
             allHits={allHits}
-            opportunityCount={
-              allHits.filter(
-                (h) => (h.page_url || '').includes(opportunityUrl) && (h.duration_seconds || 60) >= opportunityDuration
-              ).length
-            }
+            highIntentUrls={highIntentUrls}
+            conversionUrls={conversionUrls}
+            opportunityDuration={opportunityDuration}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
           />
@@ -679,22 +758,33 @@ export default function MerchantDashboard() {
           />
         )}
 
-        {activeTab === 'demographic' && <DemographicTab />}
-
-        {activeTab === 'opportunity' && (
-          <OpportunityTab
+        {(activeTab === 'high_intent' || activeTab === 'opportunity') && (
+          <HighIntentTab
             companies={companies}
             generalVisitors={combinedGeneralVisitors}
             allHits={allHits}
-            opportunityUrl={opportunityUrl}
+            highIntentUrls={highIntentUrls}
             opportunityDuration={opportunityDuration}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
+            onSaveHighIntentUrls={(urls) => setHighIntentUrls(urls)}
           />
         )}
 
-        {activeTab === 'slipped' && <SlippedTab />}
+        {activeTab === 'conversion' && (
+          <ConversionTab
+            companies={companies}
+            generalVisitors={combinedGeneralVisitors}
+            allHits={allHits}
+            conversionUrls={conversionUrls}
+            onNavigateTab={(tab) => handleTabSwitch(tab)}
+            onSelectCompany={(id) => setSelectedCompanyId(id)}
+            onSaveConversionUrls={(urls) => setConversionUrls(urls)}
+          />
+        )}
 
+        {activeTab === 'demographic' && <DemographicTab />}
+        {activeTab === 'slipped' && <SlippedTab />}
         {activeTab === 'settings' && (
           <SettingsTab
             wpSettings={wpSettings}

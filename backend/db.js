@@ -10,7 +10,7 @@ const mysql = require('mysql2/promise');
 
 let pool = null;
 let isConnected = false;
-let currentDbName = process.env.DB_NAME || 'wordpress_practice';
+let currentDbName = process.env.DB_NAME || 'store_visiting';
 
 function getDbConfig(dbName) {
   return {
@@ -18,7 +18,7 @@ function getDbConfig(dbName) {
     port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: dbName || process.env.DB_NAME || 'wordpress_practice',
+    database: dbName || process.env.DB_NAME || 'store_visiting',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -26,7 +26,7 @@ function getDbConfig(dbName) {
 }
 
 async function initDb() {
-  const targetDbs = process.env.DB_NAME ? [process.env.DB_NAME] : ['wordpress_practice', 'store_visiting'];
+  const targetDbs = process.env.DB_NAME ? [process.env.DB_NAME] : ['store_visiting', 'wordpress_practice'];
   let lastError = null;
 
   for (const dbName of targetDbs) {

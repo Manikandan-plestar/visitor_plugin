@@ -6,81 +6,138 @@ import {
   Clock,
   Zap,
   TrendingUp,
-  ArrowUpRight,
   Globe,
   Monitor,
   Smartphone,
   Laptop,
-  Compass,
-  ChevronRight,
-  ExternalLink,
-  Layers,
+  RotateCcw,
   Sparkles,
-  ShieldCheck,
-  CheckCircle2,
+  Layers,
+  Target,
+  Share2,
+  Compass,
+  ArrowUpRight,
 } from 'lucide-react';
+import { parseTrafficSource, getIpLocation } from './TrafficTab';
 
 export default function DashboardTab({
   companies = [],
   generalVisitors = [],
   allHits = [],
-  opportunityCount = 0,
+  highIntentUrls = ['/pricing', '/product/industrial-turbine-sensor', '/checkout', '/four-plans', '/contact-sales'],
+  conversionUrls = ['/thank-you', '/order-received', '/order-confirmed', '/checkout/success', '/checkout'],
+  opportunityDuration = 60,
   onSelectCompany,
   onNavigateTab,
 }) {
   const [timeRange, setTimeRange] = useState('14d');
 
-  // Calculate high-level KPIs
-  const totalIdentifiedCompanies = companies.length;
-  const totalConsumerHits = generalVisitors.length;
-  const totalCorporateHits = companies.reduce((sum, c) => sum + (c.page_visits?.length || 0), 0);
-  const totalPageHits = totalCorporateHits + totalConsumerHits;
-  const totalDwellSeconds = companies.reduce(
-    (sum, c) => sum + (c.page_visits?.reduce((s, h) => s + (parseInt(h.duration, 10) || 60), 0) || 0),
-    generalVisitors.reduce((s, g) => s + (g.duration_seconds || 60), 0)
-  );
+  // Normalize configured target URLs
+  const normalizedHighIntentUrls = useMemo(() => {
+    const raw = Array.isArray(highIntentUrls) ? highIntentUrls : String(highIntentUrls || '').split(',');
+    return raw.map((u) => u.trim().toLowerCase()).filter(Boolean);
+  }, [highIntentUrls]);
 
-  const avgDwellSeconds = totalPageHits > 0 ? Math.round(totalDwellSeconds / totalPageHits) : 60;
-  const formatSeconds = (sec) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}m ${s < 10 ? '0' : ''}${s}s`;
-  };
+  const normalizedConversionUrls = useMemo(() => {
+    const raw = Array.isArray(conversionUrls) ? conversionUrls : String(conversionUrls || '').split(',');
+    return raw.map((u) => u.trim().toLowerCase()).filter(Boolean);
+  }, [conversionUrls]);
 
-  // Top Visited Pages
-  const topPages = useMemo(() => {
-    const pageCounts = {};
-    allHits.forEach((h) => {
-      const p = h.page_url || '/';
-      pageCounts[p] = (pageCounts[p] || 0) + 1;
-    });
-    return Object.entries(pageCounts)
-      .map(([url, count]) => ({ url, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [allHits]);
+  // Aggregate hits by unique IP address to accurately distinguish New vs Returning visitors
+  const ipStats = useMemo(() => {
+    const map = new Map();
 
-  const maxPageCount = topPages[0]?.count || 1;
-
-  // Acquisition Channels
-  const channelBreakdown = useMemo(() => {
-    const counts = { 'Google Organic': 0, 'Direct Navigation': 0, 'LinkedIn Referral': 0, 'Partner Stores': 0 };
+    // 1. Corporate hits
     companies.forEach((c) => {
-      const ch = c.acquisition_channel || 'Direct Navigation';
-      if (ch.includes('Google')) counts['Google Organic']++;
-      else if (ch.includes('LinkedIn')) counts['LinkedIn Referral']++;
-      else if (c.is_partner_store) counts['Partner Stores']++;
-      else counts['Direct Navigation']++;
+      (c.page_visits || []).forEach((hit) => {
+        const ip = hit.visitor_ip || c.activation_ip || 'Unknown';
+        if (!map.has(ip)) {
+          map.set(ip, {
+            ip,
+            isCorporate: true,
+            companyName: c.company_name,
+            totalHits: 0,
+            pagesVisited: new Set(),
+            dwellSeconds: 0,
+            country: c.country || '',
+            city: c.city || '',
+            physicalAddress: c.physical_address || '',
+            referrer: hit.referrer || 'Direct Navigation',
+            acquisitionChannel: c.acquisition_channel,
+            browser: hit.browser || 'Chrome',
+            hits: [],
+          });
+        }
+        const rec = map.get(ip);
+        rec.totalHits += 1;
+        rec.dwellSeconds += parseInt(hit.duration, 10) || 60;
+        if (hit.page_url) rec.pagesVisited.add(hit.page_url);
+        rec.hits.push(hit);
+      });
     });
-    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-    return Object.entries(counts).map(([name, count]) => ({
-      name,
-      count,
-      pct: Math.round((count / total) * 100),
-    }));
-  }, [companies]);
 
-  // Traffic Trendline Data
+    // 2. General consumer hits
+    generalVisitors.forEach((gen) => {
+      const ip = gen.visitor_ip || 'Unknown';
+      if (!map.has(ip)) {
+        map.set(ip, {
+          ip,
+          isCorporate: false,
+          companyName: null,
+          totalHits: 0,
+          pagesVisited: new Set(),
+          dwellSeconds: 0,
+          country: gen.country || '',
+          city: gen.city || '',
+          physicalAddress: gen.physical_address || '',
+          referrer: gen.referrer || 'Direct Navigation',
+          acquisitionChannel: null,
+          browser: gen.browser || 'Chrome',
+          hits: [],
+        });
+      }
+      const rec = map.get(ip);
+      rec.totalHits += 1;
+      rec.dwellSeconds += gen.duration_seconds || 60;
+      if (gen.page_url) rec.pagesVisited.add(gen.page_url);
+      rec.hits.push(gen);
+    });
+
+    return Array.from(map.values());
+  }, [companies, generalVisitors]);
+
+  // Calculate accurate KPI values
+  const totalVisitorsCount = ipStats.length;
+  const totalHitsCount = allHits.length || ipStats.reduce((s, r) => s + r.totalHits, 0);
+  const newVisitorsCount = ipStats.filter((r) => r.totalHits <= 1).length;
+  const returningVisitorsCount = ipStats.filter((r) => r.totalHits > 1).length;
+  const totalPageViewsCount = totalHitsCount;
+
+  // High-Intent visitors calculation (matching any configured High-Intent URL)
+  const highIntentVisitorsCount = useMemo(() => {
+    return ipStats.filter((r) => {
+      return r.hits.some((h) => {
+        const page = (h.page_url || '').toLowerCase();
+        const dur = parseInt(h.duration, 10) || h.duration_seconds || 60;
+        const matchesUrl = normalizedHighIntentUrls.some((target) => page.includes(target));
+        return matchesUrl && dur >= (opportunityDuration || 60);
+      });
+    }).length;
+  }, [ipStats, normalizedHighIntentUrls, opportunityDuration]);
+
+  // Conversions calculation (matching any configured Conversion Page URL)
+  const conversionsCount = useMemo(() => {
+    return ipStats.filter((r) => {
+      return r.hits.some((h) => {
+        const page = (h.page_url || '').toLowerCase();
+        return normalizedConversionUrls.some((target) => page.includes(target));
+      });
+    }).length;
+  }, [ipStats, normalizedConversionUrls]);
+
+  const totalIdentifiedCompanies = companies.length;
+
+  // Storefront Activity: 14-day daily hit volume trend
   const trafficDays = useMemo(() => {
     const days = 14;
     const result = [];
@@ -90,267 +147,368 @@ export default function DashboardTab({
       const label = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const dayStr = dayDate.toISOString().slice(0, 10);
       const dayHits = allHits.filter((h) => (h.visited_at || '').startsWith(dayStr)).length;
-      const count = dayHits > 0 ? dayHits : Math.max(1, ((i * 3 + 2) % 7) + 2);
-      result.push({ label, count, date: dayStr });
+      result.push({ label, count: dayHits, date: dayStr });
     }
     return result;
   }, [allHits]);
 
-  const maxDailyCount = Math.max(...trafficDays.map((d) => d.count), 10);
+  const maxDailyCount = Math.max(...trafficDays.map((d) => d.count), 5);
 
-  // Recent 5 Companies
-  const recentCompanies = useMemo(() => {
-    return companies.slice(0, 5);
-  }, [companies]);
+  // 1. Country Source Breakdown
+  const countrySourceBreakdown = useMemo(() => {
+    const counts = {};
+    const flags = {};
+    ipStats.forEach((r) => {
+      const loc = getIpLocation(r);
+      const country = loc.country || 'Global Network';
+      counts[country] = (counts[country] || 0) + r.totalHits;
+      flags[country] = loc.flag || '🌐';
+    });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+    return Object.entries(counts)
+      .map(([name, count]) => ({
+        name,
+        flag: flags[name] || '🌐',
+        count,
+        pct: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [ipStats]);
+
+  // 2. Traffic Source Breakdown
+  const trafficSourceBreakdown = useMemo(() => {
+    const counts = {};
+    ipStats.forEach((r) => {
+      const src = parseTrafficSource(r.referrer, r.acquisitionChannel);
+      const label = src.label || 'Direct Navigation';
+      counts[label] = (counts[label] || 0) + r.totalHits;
+    });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+    return Object.entries(counts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [ipStats]);
+
+  // 3. Device Source Breakdown
+  const deviceSourceBreakdown = useMemo(() => {
+    const counts = { Desktop: 0, Mobile: 0, Tablet: 0 };
+    ipStats.forEach((r) => {
+      const b = (r.browser || '').toLowerCase();
+      if (b.includes('mobile') || b.includes('iphone') || b.includes('android')) {
+        counts.Mobile += r.totalHits;
+      } else if (b.includes('tablet') || b.includes('ipad')) {
+        counts.Tablet += r.totalHits;
+      } else {
+        counts.Desktop += r.totalHits;
+      }
+    });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+    return [
+      { name: 'Desktop', count: counts.Desktop, pct: Math.round((counts.Desktop / total) * 100), icon: Monitor },
+      { name: 'Mobile', count: counts.Mobile, pct: Math.round((counts.Mobile / total) * 100), icon: Smartphone },
+      { name: 'Tablet', count: counts.Tablet, pct: Math.round((counts.Tablet / total) * 100), icon: Laptop },
+    ];
+  }, [ipStats]);
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Card 1 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Identified Companies</span>
-            <span className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
-              <Building2 className="w-5 h-5" />
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{totalIdentifiedCompanies}</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 flex items-center gap-0.5">
-              <TrendingUp className="w-3 h-3" /> +100%
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1 truncate">Real-time corporate reverse-IP matches</p>
-        </div>
-
-        {/* Card 2 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Total Page Hits</span>
-            <span className="p-2.5 rounded-xl bg-purple-50 text-purple-600 shrink-0">
-              <Eye className="w-5 h-5" />
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{totalPageHits}</span>
-            <span className="text-xs text-slate-500 font-medium truncate">({totalCorporateHits} corporate)</span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1 truncate">Aggregate storefront page requests</p>
-        </div>
-
-        {/* Card 3 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">High Intent Leads</span>
-            <span className="p-2.5 rounded-xl bg-amber-50 text-amber-600 shrink-0">
-              <Zap className="w-5 h-5" />
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{opportunityCount}</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
-              Target URLs
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1 truncate">Visitors exceeding dwell thresholds</p>
-        </div>
-
-        {/* Card 4 */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow min-w-0">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Average Dwell Time</span>
-            <span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
-              <Clock className="w-5 h-5" />
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{formatSeconds(avgDwellSeconds)}</span>
-            <span className="text-xs text-slate-500 font-medium">per hit</span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1 truncate">Engagement on storefront pages</p>
-        </div>
-      </div>
-
-      {/* Main Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-        {/* Traffic Trend Chart (Takes 2 Columns) */}
-        <div className="lg:col-span-2 min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-blue-600" />
-                Storefront Traffic Activity
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">Daily visitor hit volume over the past 14 days</p>
-            </div>
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start sm:self-auto">
-              <span className="px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs">14 Days</span>
-              <span className="px-2.5 py-1 text-slate-500">Live Telemetry</span>
-            </div>
-          </div>
-
-          {/* SVG Bar / Area Visualization */}
-          <div className="mt-6 w-full overflow-hidden">
-            <div className="h-56 flex items-end justify-between gap-1 sm:gap-2 pt-6 pb-2 w-full">
-              {trafficDays.map((day, idx) => {
-                const heightPct = Math.max(12, Math.round((day.count / maxDailyCount) * 100));
-                return (
-                  <div key={idx} className="flex-1 min-w-0 flex flex-col items-center h-full justify-end group relative">
-                    {/* Tooltip on hover */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 px-2 py-1 bg-slate-900 text-white text-[10px] rounded-md font-mono whitespace-nowrap pointer-events-none shadow-md z-20">
-                      {day.count} hits • {day.label}
-                    </div>
-                    {/* Bar Column */}
-                    <div className="w-full max-w-[24px] bg-slate-100 rounded-t-lg overflow-hidden flex flex-col justify-end h-full">
-                      <div
-                        style={{ height: `${heightPct}%` }}
-                        className="w-full bg-gradient-to-t from-blue-600 to-indigo-500 rounded-t-lg transition-all duration-500 group-hover:from-blue-500 group-hover:to-indigo-400"
-                      ></div>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-mono mt-2 truncate w-full text-center">
-                      {day.label.split(' ')[1]}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Daily Page Hits
-              </span>
-              <span>Total Window Volume: {allHits.length || 25} requests</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Acquisition Channels (1 Column) */}
-        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs flex flex-col justify-between overflow-hidden">
+      {/* ======================================================================= */}
+      {/* A. Storefront Activity Section (Full Available Content Width at Top)    */}
+      {/* ======================================================================= */}
+      <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <div>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Compass className="w-4 h-4 text-emerald-600" />
-                Traffic Sources
-              </h3>
-              <span className="text-xs text-slate-400 font-mono">B2B Sources</span>
-            </div>
-
-            <div className="mt-5 space-y-4">
-              {channelBreakdown.map((item, idx) => {
-                const colors = ['bg-blue-600', 'bg-emerald-600', 'bg-indigo-600', 'bg-amber-600'];
-                return (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700 flex items-center gap-2 truncate">
-                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colors[idx % colors.length]}`}></span>
-                        <span className="truncate">{item.name}</span>
-                      </span>
-                      <span className="font-mono text-slate-600 shrink-0">{item.count} ({item.pct}%)</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        style={{ width: `${item.pct}%` }}
-                        className={`h-full ${colors[idx % colors.length]} rounded-full transition-all duration-500`}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+              <span>Storefront Activity</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Daily visitor telemetry and request volume over the past 14 days
+            </p>
           </div>
-
-          <div className="mt-6 pt-4 border-t border-slate-100 bg-slate-50/60 rounded-xl p-3 flex items-center gap-2.5 text-xs text-slate-600">
-            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>Organic search delivers the highest percentage of multi-page B2B visitors.</span>
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start sm:self-auto">
+            <span className="px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs font-bold">14 Days</span>
+            <span className="px-2.5 py-1 text-slate-500">Live Telemetry</span>
           </div>
         </div>
-      </div>
 
-      {/* Second Row: Top Visited Pages & Recent Companies */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-        {/* Top Pages */}
-        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-indigo-600" />
-              Top Visited Store Pages
-            </h3>
-            <button
-              onClick={() => onNavigateTab('traffic')}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer shrink-0"
-            >
-              View Full Traffic <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="mt-4 space-y-3.5">
-            {topPages.map((page, idx) => {
-              const pct = Math.round((page.count / maxPageCount) * 100);
+        {/* Full-Width SVG Bar / Activity Visualization */}
+        <div className="mt-6 w-full overflow-hidden">
+          <div className="h-48 sm:h-56 flex items-end justify-between gap-1 sm:gap-2.5 pt-6 pb-2 w-full">
+            {trafficDays.map((day, idx) => {
+              const heightPct = day.count > 0 ? Math.max(16, Math.round((day.count / maxDailyCount) * 100)) : 6;
               return (
-                <div key={idx} className="p-3 bg-slate-50/70 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors">
-                  <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
-                    <span className="font-mono font-semibold text-slate-800 truncate flex-1 min-w-0">
-                      {page.url}
-                    </span>
-                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md font-mono text-slate-700 font-bold shrink-0">
-                      {page.count} hits
-                    </span>
+                <div key={idx} className="flex-1 min-w-0 flex flex-col items-center h-full justify-end group relative">
+                  {/* Tooltip on hover */}
+                  <div className="opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity absolute -top-9 bg-slate-900 text-white text-[11px] font-mono py-1 px-2 rounded-lg whitespace-nowrap shadow-md z-20">
+                    {day.date}: {day.count} {day.count === 1 ? 'hit' : 'hits'}
                   </div>
-                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div style={{ width: `${pct}%` }} className="h-full bg-indigo-600 rounded-full"></div>
+
+                  {/* Volume Bar */}
+                  <div className="w-full max-w-[28px] bg-slate-100 rounded-t-lg overflow-hidden h-full flex items-end">
+                    <div
+                      style={{ height: `${heightPct}%` }}
+                      className={`w-full rounded-t-lg transition-all duration-500 ${
+                        day.count > 0
+                          ? 'bg-gradient-to-t from-blue-600 to-indigo-500 group-hover:from-blue-500 group-hover:to-indigo-400 shadow-xs'
+                          : 'bg-slate-200'
+                      }`}
+                    ></div>
                   </div>
+
+                  {/* Date Label */}
+                  <span className="text-[10px] text-slate-400 font-mono mt-2 truncate max-w-full block">
+                    {day.label}
+                  </span>
                 </div>
               );
             })}
           </div>
         </div>
+      </div>
 
-        {/* Recent Companies Feed */}
-        <div className="min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-blue-600" />
-              Recently Identified B2B Visitors
-            </h3>
-            <button
-              onClick={() => onNavigateTab('firmographic')}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer shrink-0"
-            >
-              All Companies <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+      {/* ======================================================================= */}
+      {/* B. Seven Compact Analytics Summary Cards                               */}
+      {/* ======================================================================= */}
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+          Storefront Telemetry & Visitor Overview
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 w-full">
+          {/* Card 1: Visitors – Total Hits */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Total Hits</span>
+              <span className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                <Eye className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{totalHitsCount}</span>
+              <p className="text-[11px] text-slate-500 mt-0.5 truncate">{totalVisitorsCount} unique IPs</p>
+            </div>
           </div>
 
-          <div className="mt-4 divide-y divide-slate-100">
-            {recentCompanies.map((comp) => (
-              <div
-                key={comp.id}
-                onClick={() => {
-                  if (onSelectCompany) onSelectCompany(comp.id);
-                  onNavigateTab('firmographic');
-                }}
-                className="py-3 flex items-center justify-between hover:bg-slate-50/70 rounded-xl px-2 transition-colors cursor-pointer group gap-2"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${comp.logo_bg}`}>
-                    {comp.initials}
+          {/* Card 2: New Visitors */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">New Visitors</span>
+              <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{newVisitorsCount}</span>
+              <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 truncate">First session</p>
+            </div>
+          </div>
+
+          {/* Card 3: Returning Visitors */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Returning</span>
+              <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+                <RotateCcw className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{returningVisitorsCount}</span>
+              <p className="text-[11px] text-indigo-700 font-semibold mt-0.5 truncate">Repeat sessions</p>
+            </div>
+          </div>
+
+          {/* Card 4: Page Views */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Page Views</span>
+              <span className="p-2 rounded-xl bg-purple-50 text-purple-600 shrink-0">
+                <Layers className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{totalPageViewsCount}</span>
+              <p className="text-[11px] text-slate-500 mt-0.5 truncate">Total requests</p>
+            </div>
+          </div>
+
+          {/* Card 5: High-Intent Visitors */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">High-Intent</span>
+              <span className="p-2 rounded-xl bg-amber-50 text-amber-600 shrink-0">
+                <Zap className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{highIntentVisitorsCount}</span>
+              <p className="text-[11px] text-amber-800 font-semibold mt-0.5 truncate">Target URL visits</p>
+            </div>
+          </div>
+
+          {/* Card 6: Conversions */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Conversions</span>
+              <span className="p-2 rounded-xl bg-rose-50 text-rose-600 shrink-0">
+                <Target className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{conversionsCount}</span>
+              <p className="text-[11px] text-rose-700 font-semibold mt-0.5 truncate">Goal page events</p>
+            </div>
+          </div>
+
+          {/* Card 7: Firmography – Identified Companies */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-shadow min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Identified B2B</span>
+              <span className="p-2 rounded-xl bg-teal-50 text-teal-600 shrink-0">
+                <Building2 className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl font-black text-slate-900">{totalIdentifiedCompanies}</span>
+              <p className="text-[11px] text-teal-700 font-semibold mt-0.5 truncate">Corporate entities</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================================= */}
+      {/* C. Three Traffic Analytics Sections: Country, Traffic Source, Device    */}
+      {/* ======================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
+        {/* 1. Country Source */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-blue-600" />
+                <span>Country Source</span>
+              </h4>
+              <span className="text-[11px] text-slate-400 font-medium">Geo distribution</span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {countrySourceBreakdown.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">No geographic data recorded yet.</div>
+              ) : (
+                countrySourceBreakdown.map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800 flex items-center gap-1.5 truncate">
+                        <span className="text-sm leading-none">{item.flag}</span>
+                        <span className="truncate">{item.name}</span>
+                      </span>
+                      <span className="font-mono text-slate-500 text-[11px] shrink-0">
+                        {item.count} hits ({item.pct}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        style={{ width: `${item.pct}%` }}
+                        className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                      ></div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                      {comp.company_name}
-                    </h4>
-                    <p className="text-[11px] text-slate-500 truncate">{comp.industry}</p>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="pt-3 mt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>Primary Markets</span>
+            <span className="font-semibold text-slate-600">{countrySourceBreakdown[0]?.name || 'Global'}</span>
+          </div>
+        </div>
+
+        {/* 2. Traffic Source */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-indigo-600" />
+                <span>Traffic Source</span>
+              </h4>
+              <span className="text-[11px] text-slate-400 font-medium">Acquisition channels</span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {trafficSourceBreakdown.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">No traffic sources detected yet.</div>
+              ) : (
+                trafficSourceBreakdown.map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800 truncate">{item.name}</span>
+                      <span className="font-mono text-slate-500 text-[11px] shrink-0">
+                        {item.count} hits ({item.pct}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        style={{ width: `${item.pct}%` }}
+                        className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                      ></div>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-xs font-mono font-semibold text-slate-700 block">
-                    {comp.page_visits?.length || 1} hits
-                  </span>
-                  <span className="text-[10px] text-emerald-600 font-medium">
-                    {comp.time_on_site}
-                  </span>
-                </div>
-              </div>
-            ))}
+                ))
+              )}
+            </div>
+          </div>
+          <div className="pt-3 mt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>Leading Acquisition</span>
+            <span className="font-semibold text-slate-600">{trafficSourceBreakdown[0]?.name || 'Direct'}</span>
+          </div>
+        </div>
+
+        {/* 3. Device Source */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-emerald-600" />
+                <span>Device Source</span>
+              </h4>
+              <span className="text-[11px] text-slate-400 font-medium">Hardware distribution</span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {deviceSourceBreakdown.map((item, idx) => {
+                const IconComponent = item.icon;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800 flex items-center gap-2 truncate">
+                        <IconComponent className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span>{item.name}</span>
+                      </span>
+                      <span className="font-mono text-slate-500 text-[11px] shrink-0">
+                        {item.count} hits ({item.pct}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        style={{ width: `${item.pct}%` }}
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="pt-3 mt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>Primary Platform</span>
+            <span className="font-semibold text-slate-600">
+              {deviceSourceBreakdown.sort((a, b) => b.count - a.count)[0]?.name || 'Desktop'}
+            </span>
           </div>
         </div>
       </div>

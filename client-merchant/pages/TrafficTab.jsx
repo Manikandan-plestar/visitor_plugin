@@ -6,6 +6,7 @@ import {
   Filter,
   Monitor,
   Smartphone,
+  Laptop,
   ChevronLeft,
   ChevronRight,
   Building2,
@@ -19,6 +20,12 @@ import {
   Compass,
   Share2,
   MapPin,
+  ArrowLeft,
+  Eye,
+  Calendar,
+  Layers,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 
 /**
@@ -141,26 +148,30 @@ export function getIpLocation(record) {
     ) {
       return { text: 'United States', flag: '🇺🇸', country: 'United States', city: '' };
     }
-    if (addr.includes('India')) {
+    if (addr.includes('India') || addr.includes('Hyderabad') || addr.includes('Telangana') || addr.includes('Kolkata')) {
       return { text: 'India', flag: '🇮🇳', country: 'India', city: '' };
     }
   }
 
-  // From IP network prefix
+  // Known sample & telemetry IP matching
   const ip = record.ip || '';
-  if (ip.startsWith('194.') || ip.startsWith('80.')) {
+  if (ip.startsWith('194.138.') || ip === '194.138.37.10') {
     return { text: 'Munich, Germany', flag: '🇩🇪', country: 'Germany', city: 'Munich' };
   }
-  if (ip.startsWith('212.') || ip.startsWith('195.')) {
-    return { text: 'London, UK', flag: '🇬🇧', country: 'United Kingdom', city: 'London' };
+  if (ip.startsWith('212.183.') || ip === '212.183.128.50' || ip === '195.144.11.22') {
+    return { text: 'England, UK', flag: '🇬🇧', country: 'United Kingdom', city: 'England' };
+  }
+  if (ip === '152.57.87.202' || ip === '122.164.45.10' || ip === '49.37.12.80' || ip === '202.53.4.20') {
+    return { text: 'India', flag: '🇮🇳', country: 'India', city: 'India' };
   }
   if (
-    ip.startsWith('98.') ||
-    ip.startsWith('157.') ||
-    ip.startsWith('104.') ||
-    ip.startsWith('108.') ||
-    ip.startsWith('173.') ||
-    ip.startsWith('73.')
+    ip === '98.142.204.11' ||
+    ip === '157.240.241.35' ||
+    ip === '104.244.42.1' ||
+    ip === '108.177.15.10' ||
+    ip === '73.189.44.110' ||
+    ip === '199.181.132.250' ||
+    ip === '128.107.241.1'
   ) {
     return { text: 'United States', flag: '🇺🇸', country: 'United States', city: '' };
   }
@@ -183,12 +194,27 @@ function formatDateWithoutTime(val) {
       });
     }
   } catch (e) {}
-
-  if (typeof val === 'string') {
-    const cleaned = val.replace(/^\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*,?\s*/i, '').trim();
-    return cleaned || val;
-  }
   return 'Recent';
+}
+
+/**
+ * Format full date and time for detail view
+ */
+function formatFullDateTime(val) {
+  if (!val) return 'Recent';
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+  } catch (e) {}
+  return String(val);
 }
 
 export default function TrafficTab({
@@ -205,6 +231,7 @@ export default function TrafficTab({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [copiedIp, setCopiedIp] = useState(null);
+  const [selectedIp, setSelectedIp] = useState(null); // When set, renders Individual IP Details View
 
   // Group and flatten visitor hits by IP Address
   const aggregatedTraffic = useMemo(() => {
@@ -222,12 +249,16 @@ export default function TrafficTab({
             companyId: comp.id,
             industry: comp.industry,
             physicalAddress: comp.physical_address,
+            officialEmail: comp.official_email,
+            telephone: comp.telephone,
+            website: comp.website,
             logoBg: comp.logo_bg,
             initials: comp.initials,
             totalHits: 0,
             totalDuration: 0,
             latestDate: formatDateWithoutTime(hit.visited_at || hit.date_time),
             latestTimestamp: hit.visited_at ? new Date(hit.visited_at).getTime() : 0,
+            firstTimestamp: hit.visited_at ? new Date(hit.visited_at).getTime() : 0,
             pagesVisited: new Set(),
             browser: hit.browser || 'Chrome',
             deviceType: hit.device_type || 'Desktop',
@@ -236,11 +267,13 @@ export default function TrafficTab({
             totalVisits: comp.total_visits || 1,
             city: comp.city || '',
             country: comp.country || '',
+            hits: [],
           });
         }
         const record = ipMap.get(ip);
         record.totalHits += 1;
-        record.totalDuration += parseInt(hit.duration, 10) || 60;
+        const dur = parseInt(hit.duration, 10) || hit.duration_seconds || 60;
+        record.totalDuration += dur;
         if (hit.page_url) record.pagesVisited.add(hit.page_url);
         record.browser = hit.browser || record.browser;
         if (hit.referrer && hit.referrer !== 'Direct Navigation' && hit.referrer !== '--') {
@@ -248,11 +281,22 @@ export default function TrafficTab({
         }
         if (hit.visited_at) {
           const ts = new Date(hit.visited_at).getTime();
+          if (!record.firstTimestamp || ts < record.firstTimestamp) {
+            record.firstTimestamp = ts;
+          }
           if (ts > record.latestTimestamp) {
             record.latestTimestamp = ts;
             record.latestDate = formatDateWithoutTime(hit.visited_at);
           }
         }
+        record.hits.push({
+          id: hit.id || Math.random(),
+          page_url: hit.page_url || '/',
+          referrer: hit.referrer || 'Direct Navigation',
+          browser: hit.browser || 'Chrome',
+          duration_seconds: dur,
+          visited_at: hit.visited_at || hit.date_time || new Date().toISOString(),
+        });
       });
     });
 
@@ -267,12 +311,16 @@ export default function TrafficTab({
           companyId: null,
           industry: 'Residential ISP',
           physicalAddress: gen.physical_address || '',
+          officialEmail: null,
+          telephone: null,
+          website: null,
           logoBg: 'bg-slate-500',
           initials: 'IP',
           totalHits: 0,
           totalDuration: 0,
           latestDate: formatDateWithoutTime(gen.visited_at),
           latestTimestamp: gen.visited_at ? new Date(gen.visited_at).getTime() : 0,
+          firstTimestamp: gen.visited_at ? new Date(gen.visited_at).getTime() : 0,
           pagesVisited: new Set(),
           browser: gen.browser || 'Chrome',
           deviceType: (gen.browser || '').includes('Mobile') ? 'Mobile' : 'Desktop',
@@ -281,22 +329,35 @@ export default function TrafficTab({
           totalVisits: 1,
           city: gen.city || '',
           country: gen.country || '',
+          hits: [],
         });
       }
       const record = ipMap.get(ip);
       record.totalHits += 1;
-      record.totalDuration += gen.duration_seconds || 60;
+      const dur = gen.duration_seconds || 60;
+      record.totalDuration += dur;
       if (gen.page_url) record.pagesVisited.add(gen.page_url);
       if (gen.referrer && gen.referrer !== 'Direct Navigation' && gen.referrer !== '--') {
         record.referrer = gen.referrer;
       }
       if (gen.visited_at) {
         const ts = new Date(gen.visited_at).getTime();
+        if (!record.firstTimestamp || ts < record.firstTimestamp) {
+          record.firstTimestamp = ts;
+        }
         if (ts > record.latestTimestamp) {
           record.latestTimestamp = ts;
           record.latestDate = formatDateWithoutTime(gen.visited_at);
         }
       }
+      record.hits.push({
+        id: gen.id || Math.random(),
+        page_url: gen.page_url || '/',
+        referrer: gen.referrer || 'Direct Navigation',
+        browser: gen.browser || 'Chrome',
+        duration_seconds: dur,
+        visited_at: gen.visited_at || new Date().toISOString(),
+      });
     });
 
     return Array.from(ipMap.values()).map((record) => {
@@ -313,6 +374,12 @@ export default function TrafficTab({
     });
   }, [companies, generalVisitors]);
 
+  // Selected IP Record for detailed view
+  const selectedIpRecord = useMemo(() => {
+    if (!selectedIp) return null;
+    return aggregatedTraffic.find((t) => t.ip === selectedIp) || null;
+  }, [selectedIp, aggregatedTraffic]);
+
   // Filter & Search
   const filteredTraffic = useMemo(() => {
     return aggregatedTraffic.filter((item) => {
@@ -323,18 +390,17 @@ export default function TrafficTab({
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchIp = item.ip.toLowerCase().includes(q);
-        const matchComp = (item.companyName || '').toLowerCase().includes(q);
-        const matchSource = (item.sourceInfo?.label || '').toLowerCase().includes(q);
-        const matchLocation = (item.locationInfo?.text || '').toLowerCase().includes(q);
-        const matchBrowser = (item.browser || '').toLowerCase().includes(q);
-        if (!matchIp && !matchComp && !matchSource && !matchLocation && !matchBrowser) return false;
+        const matchesIp = item.ip.toLowerCase().includes(q);
+        const matchesCompany = (item.companyName || '').toLowerCase().includes(q);
+        const matchesLocation = (item.locationInfo?.text || '').toLowerCase().includes(q);
+        const matchesSource = (item.sourceInfo?.label || '').toLowerCase().includes(q);
+        return matchesIp || matchesCompany || matchesLocation || matchesSource;
       }
       return true;
     });
   }, [aggregatedTraffic, filterType, searchQuery]);
 
-  // Sorting
+  // Sort
   const sortedTraffic = useMemo(() => {
     const list = [...filteredTraffic];
     list.sort((a, b) => {
@@ -346,11 +412,11 @@ export default function TrafficTab({
       } else if (sortField === 'duration') {
         valA = a.totalDuration;
         valB = b.totalDuration;
+      } else if (sortField === 'ip') {
+        return sortOrder === 'asc' ? a.ip.localeCompare(b.ip) : b.ip.localeCompare(a.ip);
       } else if (sortField === 'date') {
         valA = a.latestTimestamp;
         valB = b.latestTimestamp;
-      } else if (sortField === 'ip') {
-        return sortOrder === 'asc' ? a.ip.localeCompare(b.ip) : b.ip.localeCompare(a.ip);
       }
       return sortOrder === 'asc' ? valA - valB : valB - valA;
     });
@@ -364,75 +430,250 @@ export default function TrafficTab({
     return sortedTraffic.slice(start, start + pageSize);
   }, [sortedTraffic, currentPage, pageSize]);
 
+  const copyToClipboard = (text) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedIp(text);
+      setTimeout(() => setCopiedIp(null), 2000);
+    } catch (e) {}
+  };
+
   const formatSeconds = (sec) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return `${m}m ${s < 10 ? '0' : ''}${s}s`;
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard?.writeText(text);
-    setCopiedIp(text);
-    setTimeout(() => setCopiedIp(null), 2000);
-  };
-
   const renderSourceBadge = (source) => {
     switch (source.type) {
+      case 'google':
+      case 'bing':
+      case 'yahoo':
+      case 'duckduckgo':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            <Search className="w-3 h-3 text-blue-500" />
+            <span>{source.label}</span>
+          </span>
+        );
+      case 'facebook':
+      case 'linkedin':
+      case 'twitter':
+      case 'instagram':
+      case 'youtube':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <Share2 className="w-3 h-3 text-indigo-500" />
+            <span>{source.label}</span>
+          </span>
+        );
       case 'direct':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
             <Compass className="w-3 h-3 text-slate-500" />
             <span>Direct</span>
           </span>
         );
-      case 'google':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-            <Search className="w-3 h-3 text-blue-600" />
-            <span>Google Search</span>
-          </span>
-        );
-      case 'facebook':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-            <Share2 className="w-3 h-3 text-indigo-600" />
-            <span>Facebook</span>
-          </span>
-        );
-      case 'linkedin':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-            <Share2 className="w-3 h-3 text-sky-600" />
-            <span>LinkedIn</span>
-          </span>
-        );
-      case 'twitter':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-900 border border-slate-300">
-            <Share2 className="w-3 h-3 text-slate-800" />
-            <span>Twitter / X</span>
-          </span>
-        );
-      case 'instagram':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-pink-50 text-pink-700 border border-pink-200">
-            <Share2 className="w-3 h-3 text-pink-600" />
-            <span>Instagram</span>
-          </span>
-        );
       default:
         return (
-          <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 truncate max-w-[170px]"
-            title={source.label}
-          >
-            <ExternalLink className="w-3 h-3 text-purple-600 shrink-0" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 max-w-[140px]">
+            <ExternalLink className="w-3 h-3 text-purple-500 shrink-0" />
             <span className="truncate">{source.label}</span>
           </span>
         );
     }
   };
 
+  // ==========================================================================
+  // B & C. Individual IP Details View (Shown when clicking any IP / visitor)
+  // ==========================================================================
+  if (selectedIpRecord) {
+    const avgDurationSec = selectedIpRecord.totalHits > 0
+      ? Math.round(selectedIpRecord.totalDuration / selectedIpRecord.totalHits)
+      : 60;
+
+    return (
+      <div className="space-y-6">
+        {/* Back Navigation Bar */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setSelectedIp(null)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer group w-fit"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
+            <span>Back to Visitor Traffic Log</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500">Visitor Classification:</span>
+            {selectedIpRecord.isCorporate ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Identified B2B Entity</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                <User className="w-3.5 h-3.5 text-slate-500" />
+                <span>General Visitor (ISP / Consumer)</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* IP Profile Hero Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-6 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-slate-100 gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-mono font-black text-base shadow-sm shrink-0">
+                {selectedIpRecord.locationInfo?.flag || 'IP'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-mono font-black text-slate-900 tracking-tight">
+                    {selectedIpRecord.ip}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedIpRecord.ip)}
+                    className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                    title="Copy IP"
+                  >
+                    {copiedIp === selectedIpRecord.ip ? (
+                      <Check className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{selectedIpRecord.locationInfo?.text || 'Global Network'}</span>
+                  <span className="text-slate-300">•</span>
+                  <span>{selectedIpRecord.isCorporate ? selectedIpRecord.companyName : 'Residential Network'}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedIpRecord.isReturning ? (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Returning Visitor</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>New Visitor</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Metric Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Total Visits</span>
+              <span className="text-xl font-black text-slate-900 mt-1 block font-mono">{selectedIpRecord.totalVisits || 1}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Page Views</span>
+              <span className="text-xl font-black text-slate-900 mt-1 block font-mono">{selectedIpRecord.totalHits}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Unique Pages</span>
+              <span className="text-xl font-black text-blue-700 mt-1 block font-mono">{selectedIpRecord.uniquePagesCount}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Avg Duration</span>
+              <span className="text-xl font-black text-emerald-700 mt-1 block font-mono">{formatSeconds(avgDurationSec)}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Traffic Source</span>
+              <div className="mt-1">{renderSourceBadge(selectedIpRecord.sourceInfo)}</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Device & Browser</span>
+              <span className="text-xs font-semibold text-slate-800 mt-1 block truncate">{selectedIpRecord.browser}</span>
+            </div>
+          </div>
+
+          {/* Company Details if Identified */}
+          {selectedIpRecord.isCorporate && (
+            <div className="bg-blue-50/50 border border-blue-200 rounded-2xl p-4 space-y-2 text-xs">
+              <h4 className="font-bold text-blue-900 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-blue-600" />
+                <span>Enriched Corporate Profile</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-700 pt-1">
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Company Name:</span>
+                  <span className="font-semibold text-slate-900">{selectedIpRecord.companyName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Industry Vertical:</span>
+                  <span className="font-semibold text-slate-900">{selectedIpRecord.industry || 'B2B Commercial'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Physical Headquarters:</span>
+                  <span className="font-semibold text-slate-900">{selectedIpRecord.physicalAddress || 'Pending verification'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Visitor Activity Details (Hit History Log) */}
+          <div className="space-y-3 pt-2">
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-blue-600" />
+              <span>Visitor Activity History ({selectedIpRecord.hits.length} Recorded Hits)</span>
+            </h4>
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                    <th className="py-3 px-4 w-12 text-center">#</th>
+                    <th className="py-3 px-4">Page URL</th>
+                    <th className="py-3 px-4 text-center">Duration</th>
+                    <th className="py-3 px-4">Traffic Source</th>
+                    <th className="py-3 px-4">Browser & Device</th>
+                    <th className="py-3 px-4 text-right">Date & Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {selectedIpRecord.hits.map((hit, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 px-4 text-center font-mono text-slate-400 font-semibold">{idx + 1}</td>
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-900 max-w-xs truncate">
+                        <span className="text-blue-600 bg-blue-50/80 px-2 py-0.5 rounded-md border border-blue-200/50">
+                          {hit.page_url}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center font-mono text-emerald-700 font-semibold">
+                        {formatSeconds(hit.duration_seconds || 60)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 truncate max-w-[160px]">
+                        {hit.referrer || 'Direct Navigation'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 truncate max-w-[140px]">{hit.browser}</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-500 text-[11px] whitespace-nowrap">
+                        {formatFullDateTime(hit.visited_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // Standard Visitor Traffic Table View
+  // ==========================================================================
   return (
     <div className="space-y-4">
       {/* Header & Controls Bar - Single Unified Row */}
@@ -445,7 +686,7 @@ export default function TrafficTab({
               <span>Visitor traffic log</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 hidden xl:block">
-              Live tracking log of visitor IPs, location, hits, and page views.
+              Live tracking log of visitor IPs, location, hits, and page views. Click any row to inspect IP details.
             </p>
           </div>
 
@@ -482,7 +723,7 @@ export default function TrafficTab({
 
             {/* Sort by Dropdown */}
             <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
-              <span className="text-slate-500 text-xs font-medium">Sort by:</span>
+              <span className="text-slate-500 text-xs font-medium">Sort:</span>
               <select
                 value={sortField}
                 onChange={(e) => setSortField(e.target.value)}
@@ -526,12 +767,13 @@ export default function TrafficTab({
                 <th className="py-3.5 px-4 text-left bg-slate-50">Traffic Source</th>
                 <th className="py-3.5 px-4 text-left bg-slate-50">Browser & Device</th>
                 <th className="py-3.5 px-4 text-right bg-slate-50">Date</th>
+                <th className="py-3.5 px-4 text-center bg-slate-50">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedTraffic.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="py-12 text-center text-slate-400">
+                  <td colSpan="12" className="py-12 text-center text-slate-400">
                     No visitor records found matching your filters.
                   </td>
                 </tr>
@@ -541,7 +783,9 @@ export default function TrafficTab({
                   return (
                     <tr
                       key={row.ip}
-                      className="hover:bg-slate-50/80 transition-colors group cursor-default"
+                      onClick={() => setSelectedIp(row.ip)}
+                      className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
+                      title="Click row to view individual IP details"
                     >
                       {/* S.No */}
                       <td className="py-3.5 px-4 text-center font-mono text-slate-400 font-semibold whitespace-nowrap">
@@ -551,12 +795,12 @@ export default function TrafficTab({
                       {/* IP Address */}
                       <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-800">
+                          <span className="font-mono font-bold text-slate-800 hover:text-blue-600 transition-colors">
                             {row.ip}
                           </span>
                           <button
                             type="button"
-                            onClick={() => copyToClipboard(row.ip)}
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(row.ip); }}
                             className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
                             title="Copy IP"
                           >
@@ -605,13 +849,7 @@ export default function TrafficTab({
                       {/* Entity / Company */}
                       <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         {row.isCorporate ? (
-                          <div
-                            onClick={() => {
-                              if (onSelectCompany && row.companyId) onSelectCompany(row.companyId);
-                              if (onNavigateTab) onNavigateTab('firmographic');
-                            }}
-                            className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
-                          >
+                          <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                             <div>
                               <span className="font-bold text-slate-900 block truncate max-w-[190px]">
@@ -634,7 +872,7 @@ export default function TrafficTab({
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
                           className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-mono font-bold text-xs inline-flex items-center gap-1"
-                          title={`Total page view hits: ${row.totalHits} (including repeated views of same page)`}
+                          title={`Total page view hits: ${row.totalHits}`}
                         >
                           <span>{row.totalHits}</span>
                           <span className="text-[10px] text-slate-500 font-normal">
@@ -685,6 +923,18 @@ export default function TrafficTab({
                       <td className="py-3.5 px-4 text-right text-slate-600 font-mono text-[11px] font-semibold whitespace-nowrap">
                         {row.latestDate}
                       </td>
+
+                      {/* Action Icon */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setSelectedIp(row.ip); }}
+                          className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-100 text-slate-500 hover:text-blue-700 transition-colors shadow-2xs"
+                          title="View IP Details"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -696,7 +946,7 @@ export default function TrafficTab({
         {/* Pagination Bar */}
         <div className="p-4 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
           <div>
-            Showing {(currentPage - 1) * pageSize + 1} to{' '}
+            Showing {sortedTraffic.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to{' '}
             {Math.min(currentPage * pageSize, sortedTraffic.length)} of {sortedTraffic.length} total visitor IPs
           </div>
 
@@ -709,7 +959,7 @@ export default function TrafficTab({
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="px-3 font-mono font-semibold">
-              Page {currentPage} of {totalPages}
+              Page {totalPages === 0 ? 1 : currentPage} of {Math.max(1, totalPages)}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}

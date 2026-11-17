@@ -341,15 +341,13 @@ function amazer_via_register_admin_dashboard_menu() {
         30
     );
 
-    // Submenus displayed when clicking or hovering Amazer Visitor Intelligence
+    // Primary 5 Submenus: Dashboard, Traffic, Firmography, High_Intent, Conversion
     $submenus = array(
         'dashboard'    => __( 'Dashboard', 'amazer-visitor-intelligence' ),
         'traffic'      => __( 'Traffic', 'amazer-visitor-intelligence' ),
-        'firmographic' => __( 'Firmographic', 'amazer-visitor-intelligence' ),
-        'demographic'  => __( 'Demographic', 'amazer-visitor-intelligence' ),
-        'opportunity'  => __( 'Opportunity', 'amazer-visitor-intelligence' ),
-        'slipped'      => __( 'Slipped', 'amazer-visitor-intelligence' ),
-        'settings'     => __( 'Settings', 'amazer-visitor-intelligence' ),
+        'firmographic' => __( 'Firmography', 'amazer-visitor-intelligence' ),
+        'high_intent'  => __( 'High_Intent', 'amazer-visitor-intelligence' ),
+        'conversion'   => __( 'Conversion', 'amazer-visitor-intelligence' ),
     );
 
     foreach ( $submenus as $tab_slug => $tab_title ) {
@@ -379,10 +377,12 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
         $initial_tab = 'traffic';
     } elseif ( strpos( (string) $hook_suffix, 'firmographic' ) !== false ) {
         $initial_tab = 'firmographic';
+    } elseif ( strpos( (string) $hook_suffix, 'high_intent' ) !== false || strpos( (string) $hook_suffix, 'opportunity' ) !== false ) {
+        $initial_tab = 'high_intent';
+    } elseif ( strpos( (string) $hook_suffix, 'conversion' ) !== false ) {
+        $initial_tab = 'conversion';
     } elseif ( strpos( (string) $hook_suffix, 'demographic' ) !== false ) {
         $initial_tab = 'demographic';
-    } elseif ( strpos( (string) $hook_suffix, 'opportunity' ) !== false ) {
-        $initial_tab = 'opportunity';
     } elseif ( strpos( (string) $hook_suffix, 'slipped' ) !== false ) {
         $initial_tab = 'slipped';
     } elseif ( strpos( (string) $hook_suffix, 'settings' ) !== false ) {
@@ -422,7 +422,9 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'nonce'               => wp_create_nonce( 'amazer_via_nonce' ),
             'trackingEnabled'     => get_option( 'amazer_via_tracking_enabled', 'no' ),
             'opportunityUrl'      => get_option( 'amazer_via_opportunity_url', '/pricing' ),
+            'highIntentUrls'      => get_option( 'amazer_via_high_intent_urls', '/pricing, /product/industrial-turbine-sensor, /checkout, /four-plans, /contact-sales' ),
             'opportunityDuration' => (int) get_option( 'amazer_via_opportunity_duration', 60 ),
+            'conversionUrls'      => get_option( 'amazer_via_conversion_urls', '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout' ),
             'slippedEnabled'      => get_option( 'amazer_via_slipped_enabled', 'yes' ),
             'slippedWindow'       => get_option( 'amazer_via_slipped_window', '48h' ),
         ) );
