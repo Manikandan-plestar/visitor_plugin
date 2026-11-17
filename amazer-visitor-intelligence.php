@@ -33,6 +33,10 @@ function amazer_via_get_api_url() {
         return untrailingslashit( esc_url_raw( AMAZER_VIA_CENTRAL_API_URL ) );
     }
 
+    if ( defined( 'SVT_CENTRAL_API_URL' ) && ! empty( SVT_CENTRAL_API_URL ) ) {
+        return untrailingslashit( esc_url_raw( SVT_CENTRAL_API_URL ) );
+    }
+
     $saved_option = get_option( 'amazer_via_central_api_url' );
     if ( ! empty( $saved_option ) ) {
         return untrailingslashit( esc_url_raw( $saved_option ) );
