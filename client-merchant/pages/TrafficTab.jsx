@@ -203,7 +203,7 @@ export default function TrafficTab({
   const [sortField, setSortField] = useState('hits'); // 'hits' | 'unique_pages' | 'duration' | 'ip' | 'date'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const [copiedIp, setCopiedIp] = useState(null);
 
   // Group and flatten visitor hits by IP Address
@@ -436,127 +436,97 @@ export default function TrafficTab({
   return (
     <div className="space-y-5">
       {/* Header & Controls Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Globe className="w-5 h-5 text-blue-600" />
-              Storefront Visitor Traffic Log
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Live tracking log of visitor IPs, geographic location, new vs. returning status, total hits, and page views.
-            </p>
-          </div>
-
-          {/* Quick Filter Pill Group */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-            <button
-              onClick={() => { setFilterType('ALL'); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                filterType === 'ALL'
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              All ({aggregatedTraffic.length})
-            </button>
-            <button
-              onClick={() => { setFilterType('NEW'); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                filterType === 'NEW'
-                  ? 'bg-white text-emerald-700 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              New ({aggregatedTraffic.filter((t) => !t.isReturning).length})
-            </button>
-            <button
-              onClick={() => { setFilterType('RETURNING'); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                filterType === 'RETURNING'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Returning ({aggregatedTraffic.filter((t) => t.isReturning).length})
-            </button>
-            <button
-              onClick={() => { setFilterType('CORPORATE'); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                filterType === 'CORPORATE'
-                  ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Corporate ({aggregatedTraffic.filter((t) => t.isCorporate).length})
-            </button>
-            <button
-              onClick={() => { setFilterType('CONSUMER'); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                filterType === 'CONSUMER'
-                  ? 'bg-white text-slate-700 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              General / ISP ({aggregatedTraffic.filter((t) => !t.isCorporate).length})
-            </button>
-          </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-4">
+        {/* Title */}
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Globe className="w-5 h-5 text-blue-600" />
+            Visitor traffic log
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Live tracking log of visitor IPs, geographic location, new vs. returning status, total hits, and page views.
+          </p>
         </div>
 
-        {/* Search & Sort Row */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
+        {/* Search Bar, Filter Dropdown, and Sort By Controls - All in the Same Row */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search Bar on Left */}
+          <div className="relative flex-1 min-w-[240px] max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               placeholder="Search by IP, Location, Company, or Source..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
             />
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto text-xs text-slate-600">
-            <span>Sort by:</span>
-            <select
-              value={sortField}
-              onChange={(e) => setSortField(e.target.value)}
-              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-            >
-              <option value="hits">Highest Total Hits</option>
-              <option value="unique_pages">Most Pages Visited</option>
-              <option value="duration">Longest Dwell Duration</option>
-              <option value="date">Date</option>
-              <option value="ip">IP Address</option>
-            </select>
-            <button
-              onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-              className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Toggle sort direction"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-600" />
-            </button>
+          {/* Right Controls: Filter Dropdown & Sort by Filter */}
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-start sm:justify-end">
+            {/* Filter Dropdown in Single Button */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors">
+              <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <select
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
+                aria-label="Filter visitor types"
+              >
+                <option value="ALL">All ({aggregatedTraffic.length})</option>
+                <option value="NEW">New ({aggregatedTraffic.filter((t) => !t.isReturning).length})</option>
+                <option value="RETURNING">Returning ({aggregatedTraffic.filter((t) => t.isReturning).length})</option>
+                <option value="CORPORATE">Corporate ({aggregatedTraffic.filter((t) => t.isCorporate).length})</option>
+                <option value="CONSUMER">General / ISP ({aggregatedTraffic.filter((t) => !t.isCorporate).length})</option>
+              </select>
+            </div>
+
+            {/* Sort by Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors">
+              <span className="text-slate-500 text-xs font-medium">Sort by:</span>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
+                aria-label="Sort visitor log"
+              >
+                <option value="hits">Highest Total Hits</option>
+                <option value="unique_pages">Most Pages Visited</option>
+                <option value="duration">Longest Dwell Duration</option>
+                <option value="date">Date</option>
+                <option value="ip">IP Address</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                className="p-1 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-slate-600"
+                title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Table Card */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Scrollable Container with Sticky Table Header */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[580px] relative">
           <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3.5 px-4 w-12 text-center">S.No</th>
-                <th className="py-3.5 px-4">IP Address</th>
-                <th className="py-3.5 px-4">Location</th>
-                <th className="py-3.5 px-4 text-center">Visitor Type</th>
-                <th className="py-3.5 px-4">Entity / Network</th>
-                <th className="py-3.5 px-4 text-center">Total Hits</th>
-                <th className="py-3.5 px-4 text-center">Page Visits</th>
-                <th className="py-3.5 px-4 text-center">Duration</th>
-                <th className="py-3.5 px-4">Traffic Source</th>
-                <th className="py-3.5 px-4">Browser & Device</th>
-                <th className="py-3.5 px-4 text-right">Date</th>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs border-b border-slate-200">
+              <tr className="text-slate-500 font-bold uppercase tracking-wider text-[11px] whitespace-nowrap">
+                <th className="py-3.5 px-4 w-12 text-center bg-slate-50">S.No</th>
+                <th className="py-3.5 px-4 text-left bg-slate-50">IP Address</th>
+                <th className="py-3.5 px-4 text-left bg-slate-50">Location</th>
+                <th className="py-3.5 px-4 text-center bg-slate-50">Visitor Type</th>
+                <th className="py-3.5 px-4 text-left bg-slate-50">Entity / Network</th>
+                <th className="py-3.5 px-4 text-center bg-slate-50">Total Hits</th>
+                <th className="py-3.5 px-4 text-center bg-slate-50">Page Visits</th>
+                <th className="py-3.5 px-4 text-center bg-slate-50">Duration</th>
+                <th className="py-3.5 px-4 text-left bg-slate-50">Traffic Source</th>
+                <th className="py-3.5 px-4 text-left bg-slate-50">Browser & Device</th>
+                <th className="py-3.5 px-4 text-right bg-slate-50">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -575,12 +545,12 @@ export default function TrafficTab({
                       className="hover:bg-slate-50/80 transition-colors group cursor-default"
                     >
                       {/* S.No */}
-                      <td className="py-3.5 px-4 text-center font-mono text-slate-400 font-semibold">
+                      <td className="py-3.5 px-4 text-center font-mono text-slate-400 font-semibold whitespace-nowrap">
                         {sNo}
                       </td>
 
                       {/* IP Address */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-bold text-slate-800">
                             {row.ip}
@@ -601,7 +571,7 @@ export default function TrafficTab({
                       </td>
 
                       {/* Location: Flag + City / Country */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         <div className="flex items-center gap-1.5 text-xs">
                           <span className="text-base leading-none shrink-0" title={row.locationInfo.country || 'Location'}>
                             {row.locationInfo.flag}
@@ -613,7 +583,7 @@ export default function TrafficTab({
                       </td>
 
                       {/* Visitor Type: New vs Returning */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {row.isReturning ? (
                           <span
                             className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
@@ -634,7 +604,7 @@ export default function TrafficTab({
                       </td>
 
                       {/* Entity / Company */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         {row.isCorporate ? (
                           <div
                             onClick={() => {
@@ -662,7 +632,7 @@ export default function TrafficTab({
                       </td>
 
                       {/* Total Hits */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
                           className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-mono font-bold text-xs inline-flex items-center gap-1"
                           title={`Total page view hits: ${row.totalHits} (including repeated views of same page)`}
@@ -675,7 +645,7 @@ export default function TrafficTab({
                       </td>
 
                       {/* Page Visits */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
                           className="px-2.5 py-0.5 rounded-lg bg-blue-50/80 text-blue-800 border border-blue-200/80 font-mono font-semibold text-xs inline-flex items-center gap-1"
                           title={`Distinct pages visited: ${Array.from(row.pagesVisited).join(', ') || '/'}`}
@@ -688,7 +658,7 @@ export default function TrafficTab({
                       </td>
 
                       {/* Duration */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span className="font-mono text-emerald-700 font-semibold flex items-center justify-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-emerald-500" />
                           {formatSeconds(row.totalDuration)}
@@ -696,12 +666,12 @@ export default function TrafficTab({
                       </td>
 
                       {/* Traffic Source: Direct / Google / Facebook / Referral */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         {renderSourceBadge(row.sourceInfo)}
                       </td>
 
                       {/* Browser & Device */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
                         <div className="flex items-center gap-1.5 text-slate-600">
                           {row.deviceType === 'Mobile' ? (
                             <Smartphone className="w-3.5 h-3.5 text-slate-400 shrink-0" />

@@ -10,15 +10,15 @@ const mysql = require('mysql2/promise');
 
 let pool = null;
 let isConnected = false;
-let currentDbName = process.env.DB_NAME || 'store_visiting';
+let currentDbName = process.env.DB_NAME || 'wordpress_practice';
 
-function getDbConfig() {
+function getDbConfig(dbName) {
   return {
     host: process.env.DB_HOST || '127.0.0.1',
     port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'store_visiting',
+    database: dbName || process.env.DB_NAME || 'wordpress_practice',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -26,30 +26,41 @@ function getDbConfig() {
 }
 
 async function initDb() {
-  const config = getDbConfig();
-  try {
-    pool = mysql.createPool(config);
-    // Test initial connection and query active database name from MySQL
-    const conn = await pool.getConnection();
-    const [dbResult] = await conn.query('SELECT DATABASE() AS current_db');
-    currentDbName = dbResult[0]?.current_db || config.database;
-    console.log(`✅ Connected to MySQL database "${currentDbName}" at ${config.host}:${config.port}`);
-    conn.release();
+  const targetDbs = process.env.DB_NAME ? [process.env.DB_NAME] : ['wordpress_practice', 'store_visiting'];
+  let lastError = null;
 
-    // Create Tables
-    await createTables();
+  for (const dbName of targetDbs) {
+    const config = getDbConfig(dbName);
+    try {
+      pool = mysql.createPool(config);
+      // Test initial connection and query active database name from MySQL
+      const conn = await pool.getConnection();
+      const [dbResult] = await conn.query('SELECT DATABASE() AS current_db');
+      currentDbName = dbResult[0]?.current_db || config.database;
+      console.log(`✅ Connected to MySQL database "${currentDbName}" at ${config.host}:${config.port}`);
+      conn.release();
 
-    // Seed Initial Data if empty
-    await seedInitialData();
+      // Create Tables
+      await createTables();
 
-    isConnected = true;
-    return { success: true, engine: 'MySQL', database: currentDbName };
-  } catch (err) {
-    console.warn(`⚠️ MySQL connection to "${config.database}" failed (${err.message}). Using in-memory fallback.`);
-    isConnected = false;
-    currentDbName = 'In-Memory Fallback';
-    return { success: false, engine: 'In-Memory', error: err.message };
+      // Seed Initial Data if empty
+      await seedInitialData();
+
+      isConnected = true;
+      return { success: true, engine: 'MySQL', database: currentDbName };
+    } catch (err) {
+      lastError = err;
+      if (pool) {
+        try { await pool.end(); } catch (e) {}
+        pool = null;
+      }
+    }
   }
+
+  console.warn(`⚠️ MySQL connection failed (${lastError ? lastError.message : 'Unknown'}). Using in-memory fallback.`);
+  isConnected = false;
+  currentDbName = 'In-Memory Fallback';
+  return { success: false, engine: 'In-Memory', error: lastError?.message };
 }
 
 async function createTables() {

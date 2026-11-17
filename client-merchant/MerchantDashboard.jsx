@@ -593,6 +593,19 @@ export default function MerchantDashboard() {
             <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
+
+          {/* Delete Demo Data Button on Top Header after Refresh Button */}
+          {isShowingDemo && (
+            <button
+              type="button"
+              onClick={handleDeleteAllDemo}
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-rose-700 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Delete educational demo data"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>Delete Demo Data</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -619,22 +632,6 @@ export default function MerchantDashboard() {
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
           >
             {togglingTracking ? 'Enabling...' : 'Enable Amazer Visitor Intelligence'}
-          </button>
-        </div>
-      )}
-
-      {/* Demo Banner */}
-      {isShowingDemo && (
-        <div className="mb-4 p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 gap-2">
-          <span className="flex items-center gap-1.5 font-medium">
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            Showing educational demo records alongside live telemetry so you can visualize the full intelligence dashboard.
-          </span>
-          <button
-            onClick={handleDeleteAllDemo}
-            className="px-2.5 py-1 bg-white hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 font-semibold cursor-pointer shrink-0 transition-colors"
-          >
-            Delete Demo Data
           </button>
         </div>
       )}
