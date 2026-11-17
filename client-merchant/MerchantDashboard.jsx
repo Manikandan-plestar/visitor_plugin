@@ -521,6 +521,27 @@ export default function MerchantDashboard() {
     }
   };
 
+  // Handler: Save High Intent URLs & Conversion URLs
+  const handleSaveAnalyticsUrls = async (newHighIntentUrls, newConversionUrls, newDuration) => {
+    setHighIntentUrls(newHighIntentUrls);
+    setConversionUrls(newConversionUrls);
+    if (newDuration) setOpportunityDuration(newDuration);
+
+    if (wpSettings.ajaxUrl && wpSettings.nonce) {
+      try {
+        const formData = new FormData();
+        formData.append('action', 'amazer_via_save_analytics_urls');
+        formData.append('nonce', wpSettings.nonce);
+        formData.append('high_intent_urls', newHighIntentUrls);
+        formData.append('conversion_urls', newConversionUrls);
+        formData.append('opportunity_duration', newDuration || opportunityDuration);
+        await fetch(wpSettings.ajaxUrl, { method: 'POST', body: formData });
+      } catch (e) {
+        console.error('Error saving analytics URLs:', e);
+      }
+    }
+  };
+
   // Handler: Save Opportunity Settings
   const handleSaveOpportunitySettings = async (url, duration) => {
     setOpportunityUrl(url);
@@ -657,74 +678,6 @@ export default function MerchantDashboard() {
         </div>
       )}
 
-      {/* Primary 5-Section Navigation Menu */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 w-fit max-w-full overflow-x-auto shadow-2xs mb-6">
-        <button
-          type="button"
-          onClick={() => handleTabSwitch('dashboard')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'dashboard'
-              ? 'bg-white text-blue-700 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          <span>Dashboard</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabSwitch('traffic')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'traffic'
-              ? 'bg-white text-blue-700 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-          }`}
-        >
-          <Globe className="w-4 h-4" />
-          <span>Traffic</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabSwitch('firmographic')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'firmographic'
-              ? 'bg-white text-blue-700 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Firmography</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabSwitch('high_intent')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'high_intent' || activeTab === 'opportunity'
-              ? 'bg-white text-blue-700 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-          }`}
-        >
-          <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
-          <span>High_Intent</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabSwitch('conversion')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'conversion'
-              ? 'bg-white text-rose-700 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-          }`}
-        >
-          <Target className="w-4 h-4 text-rose-600" />
-          <span>Conversion</span>
-        </button>
-      </div>
-
       {/* Multi-Page Route Render */}
       <div className="w-full max-w-full overflow-hidden">
         {activeTab === 'dashboard' && (
@@ -788,11 +741,13 @@ export default function MerchantDashboard() {
         {activeTab === 'settings' && (
           <SettingsTab
             wpSettings={wpSettings}
-            opportunityUrl={opportunityUrl}
+            highIntentUrls={highIntentUrls}
+            conversionUrls={conversionUrls}
             opportunityDuration={opportunityDuration}
             slippedEnabled={slippedEnabled}
             slippedWindow={slippedWindow}
             trackingEnabled={trackingEnabled}
+            onSaveAnalyticsUrls={handleSaveAnalyticsUrls}
             onSaveOpportunitySettings={handleSaveOpportunitySettings}
             onSaveSlippedSettings={handleSaveSlippedSettings}
             onSaveApiEndpoint={handleSaveApiEndpoint}

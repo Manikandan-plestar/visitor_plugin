@@ -215,6 +215,15 @@ export default function HighIntentTab({
 
   const maxTrend = Math.max(...trendDays.map((d) => d.count), 5);
 
+  // Unique High Intent URLs for URL-wise filter dropdown
+  const uniqueMatchedUrls = useMemo(() => {
+    const counts = new Map();
+    aggregatedVisitors.forEach((v) => {
+      counts.set(v.pageUrl, (counts.get(v.pageUrl) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([url, count]) => ({ url, count }));
+  }, [aggregatedVisitors]);
+
   // Filter & Search
   const filteredVisitors = useMemo(() => {
     return aggregatedVisitors.filter((r) => {
@@ -273,37 +282,7 @@ export default function HighIntentTab({
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
-      {/* ======================================================================= */}
-      {/* 1. Header & Configuration Notice                                       */}
-      {/* ======================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-500 fill-amber-500" />
-            <span>High_Intent Visitor Intelligence</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Tracked visitors who accessed configured high-intent storefront pages (e.g. pricing, checkout, key product funnels) with engagement dwell time &ge; {minDurationSec}s.
-          </p>
-        </div>
-
-        {/* Configured Target URLs Badges */}
-        <div className="flex items-center gap-1.5 flex-wrap max-w-md">
-          <span className="text-[11px] font-semibold text-slate-400">Target URLs:</span>
-          {targetUrlsList.slice(0, 3).map((u, i) => (
-            <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-              {u}
-            </span>
-          ))}
-          {targetUrlsList.length > 3 && (
-            <span className="text-[10px] text-slate-400 font-semibold">+{targetUrlsList.length - 3} more</span>
-          )}
-        </div>
-      </div>
-
-      {/* ======================================================================= */}
-      {/* 2. Top Analytics Summary Cards                                          */}
-      {/* ======================================================================= */}
+      {/* Top Analytics Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Unique Visitors</span>
@@ -430,37 +409,59 @@ export default function HighIntentTab({
       {/* ======================================================================= */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
         {/* Controls Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="relative w-full lg:w-72">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               placeholder="Search by IP, Company, or URL..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition-all shadow-2xs"
             />
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
-            <span className="text-slate-500 font-medium">Sort:</span>
-            <select
-              value={sortField}
-              onChange={(e) => setSortField(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-            >
-              <option value="hits">Most Page Views</option>
-              <option value="duration">Longest Duration</option>
-              <option value="date">Recent Visit</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => setSortOrder((p) => (p === 'asc' ? 'desc' : 'asc'))}
-              className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer text-slate-600"
-              title="Toggle sort direction"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-            </button>
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap justify-start lg:justify-end text-xs">
+            {/* URL Filter Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
+              <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span className="text-slate-500 font-medium">URL:</span>
+              <select
+                value={activeUrlFilter}
+                onChange={(e) => { setActiveUrlFilter(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1 max-w-[200px]"
+                aria-label="Filter by High Intent URL"
+              >
+                <option value="ALL">All URLs ({aggregatedVisitors.length})</option>
+                {uniqueMatchedUrls.map((item) => (
+                  <option key={item.url} value={item.url}>
+                    {item.url} ({item.count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
+              <span className="text-slate-500 font-medium">Sort:</span>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="hits">Most Page Views</option>
+                <option value="duration">Longest Duration</option>
+                <option value="date">Recent Visit</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortOrder((p) => (p === 'asc' ? 'desc' : 'asc'))}
+                className="p-1 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-slate-600"
+                title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -612,3 +613,4 @@ export default function HighIntentTab({
     </div>
   );
 }
+

@@ -40,6 +40,7 @@ export default function ConversionTab({
   const [pageSize, setPageSize] = useState(10);
   const [sortField, setSortField] = useState('date'); // 'date' | 'ip' | 'country'
   const [sortOrder, setSortOrder] = useState('desc');
+  const [activeUrlFilter, setActiveUrlFilter] = useState('ALL');
   const [selectedVisitorDetail, setSelectedVisitorDetail] = useState(null);
 
   // Normalize configured conversion URLs array
@@ -257,19 +258,40 @@ export default function ConversionTab({
     ];
   }, [conversionVisitors]);
 
+  // Unique Conversion URLs for filter dropdown
+  const uniqueMatchedConversionUrls = useMemo(() => {
+    const counts = new Map();
+    conversionVisitors.forEach((v) => {
+      (v.events || []).forEach((e) => {
+        const u = e.pageUrl || 'Conversion Page';
+        counts.set(u, (counts.get(u) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries()).map(([url, count]) => ({ url, count }));
+  }, [conversionVisitors]);
+
   // Filter & Search
   const filteredVisitors = useMemo(() => {
     return conversionVisitors.filter((v) => {
+      if (activeUrlFilter !== 'ALL') {
+        const hasUrl = (v.events || []).some((e) =>
+          (e.pageUrl || '').toLowerCase().includes(activeUrlFilter.toLowerCase())
+        );
+        if (!hasUrl) return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesIp = v.ip.toLowerCase().includes(q);
         const matchesCountry = (v.country || '').toLowerCase().includes(q);
         const matchesCompany = (v.companyName || '').toLowerCase().includes(q);
-        return matchesIp || matchesCountry || matchesCompany;
+        const matchesUrl = (v.events || []).some((e) =>
+          (e.pageUrl || '').toLowerCase().includes(q)
+        );
+        return matchesIp || matchesCountry || matchesCompany || matchesUrl;
       }
       return true;
     });
-  }, [conversionVisitors, searchQuery]);
+  }, [conversionVisitors, activeUrlFilter, searchQuery]);
 
   // Sort
   const sortedVisitors = useMemo(() => {
@@ -306,34 +328,6 @@ export default function ConversionTab({
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
-      {/* ======================================================================= */}
-      {/* 1. Header & Configuration Notice                                       */}
-      {/* ======================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Target className="w-5 h-5 text-rose-600" />
-            <span>Storefront Conversion Intelligence</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Tracked visitors who completed key goal actions or accessed configured conversion URLs (e.g. order confirmation, thank you, registration).
-          </p>
-        </div>
-
-        {/* Configured Conversion URLs Badges */}
-        <div className="flex items-center gap-1.5 flex-wrap max-w-md">
-          <span className="text-[11px] font-semibold text-slate-400">Conversion URLs:</span>
-          {targetConversionUrls.slice(0, 3).map((u, i) => (
-            <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200">
-              {u}
-            </span>
-          ))}
-          {targetConversionUrls.length > 3 && (
-            <span className="text-[10px] text-slate-400 font-semibold">+{targetConversionUrls.length - 3} more</span>
-          )}
-        </div>
-      </div>
-
       {/* Distinction Notice (Section 6 Requirement) */}
       <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start sm:items-center gap-2.5 text-xs text-amber-900">
         <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
@@ -472,37 +466,59 @@ export default function ConversionTab({
       {/* ======================================================================= */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
         {/* Controls Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="relative w-full lg:w-72">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               placeholder="Search by IP, Country, or Company..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition-all"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-2xs"
             />
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
-            <span className="text-slate-500 font-medium">Sort:</span>
-            <select
-              value={sortField}
-              onChange={(e) => setSortField(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-            >
-              <option value="date">Conversion Date</option>
-              <option value="ip">IP Address</option>
-              <option value="country">Country</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => setSortOrder((p) => (p === 'asc' ? 'desc' : 'asc'))}
-              className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer text-slate-600"
-              title="Toggle sort direction"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-            </button>
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap justify-start lg:justify-end text-xs">
+            {/* Conversion URL Filter Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
+              <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span className="text-slate-500 font-medium">URL:</span>
+              <select
+                value={activeUrlFilter}
+                onChange={(e) => { setActiveUrlFilter(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1 max-w-[200px]"
+                aria-label="Filter by Conversion URL"
+              >
+                <option value="ALL">All URLs ({conversionVisitors.length})</option>
+                {uniqueMatchedConversionUrls.map((item) => (
+                  <option key={item.url} value={item.url}>
+                    {item.url} ({item.count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
+              <span className="text-slate-500 font-medium">Sort:</span>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="date">Conversion Date</option>
+                <option value="ip">IP Address</option>
+                <option value="country">Country</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortOrder((p) => (p === 'asc' ? 'desc' : 'asc'))}
+                className="p-1 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-slate-600"
+                title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -558,6 +574,11 @@ export default function ConversionTab({
                         {row.isCorporate && (
                           <span className="text-[10px] text-slate-500 block truncate max-w-[150px]">
                             {row.companyName}
+                          </span>
+                        )}
+                        {row.events && row.events[0]?.pageUrl && (
+                          <span className="font-mono text-[10px] text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/60 block truncate max-w-[170px] mt-0.5">
+                            {row.events[0].pageUrl}
                           </span>
                         )}
                       </td>
@@ -652,3 +673,4 @@ export default function ConversionTab({
     </div>
   );
 }
+

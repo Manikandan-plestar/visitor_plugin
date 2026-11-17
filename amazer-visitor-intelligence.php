@@ -341,13 +341,14 @@ function amazer_via_register_admin_dashboard_menu() {
         30
     );
 
-    // Primary 5 Submenus: Dashboard, Traffic, Firmography, High_Intent, Conversion
+    // Primary Submenus: Dashboard, Traffic, Firmography, High Intent, Conversion, Settings
     $submenus = array(
         'dashboard'    => __( 'Dashboard', 'amazer-visitor-intelligence' ),
         'traffic'      => __( 'Traffic', 'amazer-visitor-intelligence' ),
         'firmographic' => __( 'Firmography', 'amazer-visitor-intelligence' ),
-        'high_intent'  => __( 'High_Intent', 'amazer-visitor-intelligence' ),
+        'high_intent'  => __( 'High Intent', 'amazer-visitor-intelligence' ),
         'conversion'   => __( 'Conversion', 'amazer-visitor-intelligence' ),
+        'settings'     => __( 'Settings', 'amazer-visitor-intelligence' ),
     );
 
     foreach ( $submenus as $tab_slug => $tab_title ) {
@@ -511,6 +512,40 @@ function amazer_via_ajax_save_opportunity_settings() {
     ) );
 }
 add_action( 'wp_ajax_amazer_via_save_opportunity_settings', 'amazer_via_ajax_save_opportunity_settings' );
+
+/**
+ * AJAX Handler: Save High Intent URLs & Conversion URLs Settings
+ */
+function amazer_via_ajax_save_analytics_urls() {
+    check_ajax_referer( 'amazer_via_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+
+    $high_intent_urls = isset( $_POST['high_intent_urls'] ) ? sanitize_textarea_field( wp_unslash( $_POST['high_intent_urls'] ) ) : '';
+    $conversion_urls  = isset( $_POST['conversion_urls'] ) ? sanitize_textarea_field( wp_unslash( $_POST['conversion_urls'] ) ) : '';
+    $duration         = isset( $_POST['opportunity_duration'] ) ? absint( wp_unslash( $_POST['opportunity_duration'] ) ) : 60;
+
+    if ( ! empty( $high_intent_urls ) ) {
+        update_option( 'amazer_via_high_intent_urls', $high_intent_urls );
+        update_option( 'amazer_via_opportunity_url', $high_intent_urls );
+    }
+    if ( ! empty( $conversion_urls ) ) {
+        update_option( 'amazer_via_conversion_urls', $conversion_urls );
+    }
+    if ( $duration > 0 ) {
+        update_option( 'amazer_via_opportunity_duration', $duration );
+    }
+
+    wp_send_json_success( array(
+        'message'              => __( 'Tracking URLs and thresholds updated successfully.', 'amazer-visitor-intelligence' ),
+        'high_intent_urls'     => get_option( 'amazer_via_high_intent_urls' ),
+        'conversion_urls'      => get_option( 'amazer_via_conversion_urls' ),
+        'opportunity_duration' => (int) get_option( 'amazer_via_opportunity_duration', 60 ),
+    ) );
+}
+add_action( 'wp_ajax_amazer_via_save_analytics_urls', 'amazer_via_ajax_save_analytics_urls' );
 
 /**
  * AJAX Handler: Save Slipped Tracking Settings

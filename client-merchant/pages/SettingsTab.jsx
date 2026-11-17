@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   SlidersHorizontal,
   Zap,
+  Target,
   ShoppingBag,
   Server,
   ShieldCheck,
@@ -15,20 +16,27 @@ import {
 
 export default function SettingsTab({
   wpSettings = {},
-  opportunityUrl = '/pricing',
+  highIntentUrls = '/pricing, /product/industrial-turbine-sensor, /checkout, /four-plans, /contact-sales',
+  conversionUrls = '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout',
   opportunityDuration = 60,
   slippedEnabled = true,
   slippedWindow = '48h',
   trackingEnabled = false,
+  onSaveAnalyticsUrls,
   onSaveOpportunitySettings,
   onSaveSlippedSettings,
   onSaveApiEndpoint,
   onToggleTracking,
 }) {
-  const [oppUrl, setOppUrl] = useState(opportunityUrl);
+  const [hiUrls, setHiUrls] = useState(
+    Array.isArray(highIntentUrls) ? highIntentUrls.join(', ') : String(highIntentUrls || '')
+  );
+  const [convUrls, setConvUrls] = useState(
+    Array.isArray(conversionUrls) ? conversionUrls.join(', ') : String(conversionUrls || '')
+  );
   const [oppDuration, setOppDuration] = useState(opportunityDuration);
-  const [oppSaved, setOppSaved] = useState(false);
-  const [oppSaving, setOppSaving] = useState(false);
+  const [analyticsSaved, setAnalyticsSaved] = useState(false);
+  const [analyticsSaving, setAnalyticsSaving] = useState(false);
 
   const [slpEnabled, setSlpEnabled] = useState(slippedEnabled);
   const [slpWindow, setSlpWindow] = useState(slippedWindow);
@@ -39,20 +47,22 @@ export default function SettingsTab({
   const [apiSaved, setApiSaved] = useState(false);
   const [apiSaving, setApiSaving] = useState(false);
 
-  const handleSaveOpp = async (e) => {
+  const handleSaveAnalytics = async (e) => {
     e.preventDefault();
-    setOppSaving(true);
-    setOppSaved(false);
+    setAnalyticsSaving(true);
+    setAnalyticsSaved(false);
     try {
-      if (onSaveOpportunitySettings) {
-        await onSaveOpportunitySettings(oppUrl, oppDuration);
+      if (onSaveAnalyticsUrls) {
+        await onSaveAnalyticsUrls(hiUrls, convUrls, oppDuration);
+      } else if (onSaveOpportunitySettings) {
+        await onSaveOpportunitySettings(hiUrls, oppDuration);
       }
-      setOppSaved(true);
-      setTimeout(() => setOppSaved(false), 3000);
+      setAnalyticsSaved(true);
+      setTimeout(() => setAnalyticsSaved(false), 3000);
     } catch (err) {
       console.error(err);
     } finally {
-      setOppSaving(false);
+      setAnalyticsSaving(false);
     }
   };
 
@@ -96,85 +106,119 @@ export default function SettingsTab({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <SlidersHorizontal className="w-5 h-5 text-blue-600" />
-          Analytics & Tracking Configuration
+          Settings & Tracking Configuration
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Manage your high-intent opportunity thresholds, cross-store slipped settings, and central API endpoints.
+          Configure High Intent URLs, Conversion target URLs, and engagement dwell time thresholds.
         </p>
       </div>
 
-      {/* 1. Opportunity Settings Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">
+      {/* 1. High Intent & Conversion URL Settings Form */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-6">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 bg-amber-100 text-amber-700 rounded-xl">
-              <Zap className="w-4 h-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">High-Intent Opportunity Settings</h3>
-              <p className="text-xs text-slate-500">
-                Specify which page visits classify a visitor as an active sales opportunity.
-              </p>
-            </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">High Intent & Conversion URL Rules</h3>
+            <p className="text-xs text-slate-500">
+              Specify storefront page patterns to detect visitor buying intent and recorded conversions.
+            </p>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full uppercase">
-            Active
+          <span className="text-[10px] font-bold px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full uppercase">
+            Active Rules
           </span>
         </div>
 
-        <form onSubmit={handleSaveOpp} className="space-y-4 pt-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Opportunity URL Pattern:
-              </label>
-              <input
-                type="text"
-                value={oppUrl}
-                onChange={(e) => setOppUrl(e.target.value)}
-                placeholder="/pricing or /checkout"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500 focus:bg-white"
-                required
-              />
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Matches exact page path or partial subpaths (e.g. <code>/pricing</code>, <code>/contact-sales</code>).
+        <form onSubmit={handleSaveAnalytics} className="space-y-5">
+          {/* High Intent Section */}
+          <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
+                <Zap className="w-4 h-4 fill-amber-500 text-amber-500" />
               </span>
+              <div>
+                <label className="text-xs font-bold text-slate-800 block">
+                  High Intent URLs:
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  Multiple URLs separated by comma (e.g. <code>/pricing, /checkout, /product/industrial-turbine-sensor</code>)
+                </span>
+              </div>
             </div>
+            <textarea
+              rows="3"
+              value={hiUrls}
+              onChange={(e) => setHiUrls(e.target.value)}
+              placeholder="/pricing, /product/industrial-turbine-sensor, /checkout, /four-plans, /contact-sales"
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-amber-500 shadow-2xs"
+              required
+            />
 
-            <div>
+            <div className="pt-1">
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Minimum Dwell Duration (Seconds):
+                Minimum Engagement Dwell Duration (Seconds):
               </label>
-              <input
-                type="number"
-                min="10"
-                max="600"
-                value={oppDuration}
-                onChange={(e) => setOppDuration(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500 focus:bg-white"
-                required
-              />
+              <div className="flex items-center gap-2 max-w-xs">
+                <input
+                  type="number"
+                  min="5"
+                  max="600"
+                  value={oppDuration}
+                  onChange={(e) => setOppDuration(e.target.value)}
+                  className="w-32 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-amber-500 shadow-2xs"
+                  required
+                />
+                <span className="text-xs text-slate-500 font-medium">seconds</span>
+              </div>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Minimum seconds a visitor must engage with the page to register as an Opportunity.
+                Minimum active time on high-intent pages before classifying as a qualified lead.
               </span>
             </div>
           </div>
 
+          {/* Conversion Section */}
+          <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-200/80 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-rose-100 text-rose-700 rounded-lg">
+                <Target className="w-4 h-4 text-rose-600" />
+              </span>
+              <div>
+                <label className="text-xs font-bold text-slate-800 block">
+                  Conversion Page URLs:
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  Multiple URLs separated by comma (e.g. <code>/thank-you, /order-received, /order-confirmed, /checkout/success</code>)
+                </span>
+              </div>
+            </div>
+            <textarea
+              rows="3"
+              value={convUrls}
+              onChange={(e) => setConvUrls(e.target.value)}
+              placeholder="/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout"
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-rose-500 shadow-2xs"
+              required
+            />
+            <span className="text-[11px] text-slate-400 block">
+              Visits to any of these URLs record a goal conversion event.
+            </span>
+          </div>
+
+          {/* Submit Actions */}
           <div className="flex items-center justify-between pt-2">
-            {oppSaved ? (
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <Check className="w-4 h-4" /> Opportunity settings updated successfully!
+            {analyticsSaved ? (
+              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                <Check className="w-4 h-4 text-emerald-600" />
+                High Intent & Conversion URLs saved successfully!
               </span>
             ) : (
-              <span className="text-xs text-slate-400">Settings save to WordPress options</span>
+              <span className="text-xs text-slate-400">Settings save to WordPress database</span>
             )}
             <button
               type="submit"
-              disabled={oppSaving}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              disabled={analyticsSaving}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {oppSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {oppSaving ? 'Saving...' : 'Save Opportunity Rules'}
+              {analyticsSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {analyticsSaving ? 'Saving...' : 'Save Configuration'}
             </button>
           </div>
         </form>
@@ -361,4 +405,3 @@ export default function SettingsTab({
     </div>
   );
 }
-
