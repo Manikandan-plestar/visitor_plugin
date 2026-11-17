@@ -31,10 +31,10 @@ This plugin relies on a 3rd-party SaaS API service to perform real-time reverse-
 == Source Code & Build Instructions ==
 
 The human-readable source code for the minified frontend bundle (dist/bundle.js) is publicly maintained and available in the following repository:
-* Repository URL: https://github.com/Manikandan-plestar/visitor_plugin
+* Repository URL: https://github.com/amazer-inc/Amazer-Visitor-Intelligence
 
 To build or compile the JavaScript bundle from source:
-1. Clone the repository: `git clone https://github.com/Manikandan-plestar/visitor_plugin.git`
+1. Clone the repository: `git clone https://github.com/amazer-inc/Amazer-Visitor-Intelligence.git`
 2. Change into the plugin directory and install dependencies:
    `npm install`
 3. Compile the production bundle:
