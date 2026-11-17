@@ -434,38 +434,37 @@ export default function TrafficTab({
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header & Controls Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-4">
-        {/* Title */}
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Globe className="w-5 h-5 text-blue-600" />
-            Visitor traffic log
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Live tracking log of visitor IPs, geographic location, new vs. returning status, total hits, and page views.
-          </p>
-        </div>
-
-        {/* Search Bar, Filter Dropdown, and Sort By Controls - All in the Same Row */}
-        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Search Bar on Left */}
-          <div className="relative flex-1 min-w-[240px] max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              placeholder="Search by IP, Location, Company, or Source..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
-            />
+    <div className="space-y-4">
+      {/* Header & Controls Bar - Single Unified Row */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+          {/* Title on Left */}
+          <div className="shrink-0">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <Globe className="w-5 h-5 text-blue-600 shrink-0" />
+              <span>Visitor traffic log</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5 hidden xl:block">
+              Live tracking log of visitor IPs, location, hits, and page views.
+            </p>
           </div>
 
-          {/* Right Controls: Filter Dropdown & Sort by Filter */}
-          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-start sm:justify-end">
+          {/* Search Bar, Filter Dropdown, and Sort By - In Same Row */}
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap justify-start lg:justify-end flex-1 max-w-full lg:max-w-3xl">
+            {/* Search Bar with compact width */}
+            <div className="relative w-full sm:w-52 md:w-64 shrink-0">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                placeholder="Search IP, location, source..."
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
+              />
+            </div>
+
             {/* Filter Dropdown in Single Button */}
-            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors">
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
               <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <select
                 value={filterType}
@@ -482,7 +481,7 @@ export default function TrafficTab({
             </div>
 
             {/* Sort by Dropdown */}
-            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors">
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
               <span className="text-slate-500 text-xs font-medium">Sort by:</span>
               <select
                 value={sortField}
