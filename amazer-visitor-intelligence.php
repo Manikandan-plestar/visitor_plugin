@@ -392,13 +392,15 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
     $bundle_js      = AMAZER_VIA_PLUGIN_DIR . 'dist/bundle.js';
     $bundle_css     = file_exists( AMAZER_VIA_PLUGIN_DIR . 'dist/index.css' ) ? AMAZER_VIA_PLUGIN_DIR . 'dist/index.css' : AMAZER_VIA_PLUGIN_DIR . 'dist/bundle.css';
     $bundle_css_url = file_exists( AMAZER_VIA_PLUGIN_DIR . 'dist/index.css' ) ? AMAZER_VIA_PLUGIN_URL . 'dist/index.css' : AMAZER_VIA_PLUGIN_URL . 'dist/bundle.css';
+    $bundle_js_ver  = file_exists( $bundle_js ) ? (string) filemtime( $bundle_js ) : AMAZER_VIA_VERSION;
+    $bundle_css_ver = file_exists( $bundle_css ) ? (string) filemtime( $bundle_css ) : AMAZER_VIA_VERSION;
 
     if ( file_exists( $bundle_css ) ) {
         wp_enqueue_style(
             'amazer-via-bundle-css',
             $bundle_css_url,
             array(),
-            AMAZER_VIA_VERSION
+            $bundle_css_ver
         );
     }
 
@@ -407,7 +409,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'amazer-via-bundle-js',
             AMAZER_VIA_PLUGIN_URL . 'dist/bundle.js',
             array( 'wp-element' ),
-            AMAZER_VIA_VERSION,
+            $bundle_js_ver,
             true
         );
 
