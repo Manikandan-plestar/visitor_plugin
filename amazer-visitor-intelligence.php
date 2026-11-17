@@ -130,16 +130,19 @@ function amazer_via_handle_local_log( WP_REST_Request $request ) {
         'visited_at'       => gmdate( 'c' ),
     );
 
-    $upload_dir = wp_upload_dir();
-    $log_dir    = $upload_dir['basedir'] . '/amazer_telemetry';
-    if ( ! file_exists( $log_dir ) ) {
-        wp_mkdir_p( $log_dir );
-        @file_put_contents( $log_dir . '/index.html', '' );
-        @file_put_contents( $log_dir . '/.htaccess', 'Deny from all' );
+    // Buffer to WordPress options with autoload disabled (no direct file operations)
+    $pending_hits = get_option( 'amazer_via_pending_hits', array() );
+    if ( ! is_array( $pending_hits ) ) {
+        $pending_hits = array();
     }
 
-    $log_file = $log_dir . '/pending_hits.log';
-    @file_put_contents( $log_file, wp_json_encode( $hit ) . "\n", FILE_APPEND | LOCK_EX );
+    // Keep buffer bounded to latest 500 hits
+    if ( count( $pending_hits ) >= 500 ) {
+        array_shift( $pending_hits );
+    }
+    $pending_hits[] = $hit;
+
+    update_option( 'amazer_via_pending_hits', $pending_hits, false );
 
     return new WP_REST_Response( array( 'success' => true, 'queued' => true ), 200 );
 }
@@ -148,40 +151,13 @@ function amazer_via_handle_local_log( WP_REST_Request $request ) {
  * Flush all pending local hits in ONE single batch API request to the central DB
  */
 function amazer_via_flush_pending_hits() {
-    $upload_dir = wp_upload_dir();
-    $log_file   = $upload_dir['basedir'] . '/amazer_telemetry/pending_hits.log';
-    $sync_file  = $upload_dir['basedir'] . '/amazer_telemetry/syncing_hits.log';
-
-    if ( ! file_exists( $log_file ) || filesize( $log_file ) === 0 ) {
+    $hits = get_option( 'amazer_via_pending_hits', array() );
+    if ( empty( $hits ) || ! is_array( $hits ) ) {
         return 0;
     }
 
-    @rename( $log_file, $sync_file );
-    if ( ! file_exists( $sync_file ) ) {
-        return 0;
-    }
-
-    $content = @file_get_contents( $sync_file );
-    if ( empty( $content ) ) {
-        @unlink( $sync_file );
-        return 0;
-    }
-
-    $lines = explode( "\n", trim( $content ) );
-    $hits  = array();
-    foreach ( $lines as $line ) {
-        if ( ! empty( $line ) ) {
-            $data = json_decode( $line, true );
-            if ( $data ) {
-                $hits[] = $data;
-            }
-        }
-    }
-
-    if ( empty( $hits ) ) {
-        @unlink( $sync_file );
-        return 0;
-    }
+    // Clear queue atomically before sending
+    delete_option( 'amazer_via_pending_hits' );
 
     $batch_endpoint = trailingslashit( amazer_via_get_api_url() ) . 'api/v1/track/batch';
     $payload = array(
@@ -198,12 +174,16 @@ function amazer_via_flush_pending_hits() {
     ) );
 
     if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
-        @unlink( $sync_file );
         return count( $hits );
     } else {
-        // Network/server temporarily down; restore unsynced hits back into pending log
-        @file_put_contents( $log_file, $content, FILE_APPEND | LOCK_EX );
-        @unlink( $sync_file );
+        // Network or server temporarily unreachable; restore unsynced hits back into pending queue
+        $current = get_option( 'amazer_via_pending_hits', array() );
+        if ( is_array( $current ) ) {
+            $merged = array_merge( $hits, $current );
+            update_option( 'amazer_via_pending_hits', array_slice( $merged, -500 ), false );
+        } else {
+            update_option( 'amazer_via_pending_hits', $hits, false );
+        }
         return 0;
     }
 }
