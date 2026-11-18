@@ -51,6 +51,88 @@
       <span id="toast-msg">Action successful</span>
     </div>
 
+    <!-- Environment & Database Live Switcher Bar -->
+    <section class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-5 rounded-2xl shadow-lg border border-slate-800">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              Operations Control
+            </span>
+            <span id="active-db-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Active DB: <span id="current-db-name" class="font-mono font-bold">store_visiting</span>
+            </span>
+            <span id="env-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+              Local Dev Active (4000)
+            </span>
+          </div>
+          <h2 class="text-base sm:text-lg font-bold text-white mt-1.5 flex items-center gap-2">
+            Environment & Database Switcher
+          </h2>
+          <p class="text-xs text-slate-300">
+            Switch between Local development (<code class="text-cyan-300">http://localhost:4000</code>) and Live Cloud (<code class="text-amber-300">https://apps.plestarinc.com:3011</code>), or switch MySQL database on the fly.
+          </p>
+        </div>
+
+        <!-- Quick Switcher Actions -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <!-- Backend URL Switcher -->
+          <div class="flex items-center rounded-xl bg-slate-800/80 p-1 border border-slate-700 text-xs">
+            <button id="btn-env-local" onclick="switchEnvironment('http://localhost:4000')" class="px-3 py-1.5 rounded-lg font-semibold transition bg-blue-600 text-white shadow-sm cursor-pointer">
+              Local URL (4000)
+            </button>
+            <button id="btn-env-live" onclick="switchEnvironment('https://apps.plestarinc.com:3011')" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-300 hover:text-white cursor-pointer" title="Live Cloud URL (Commented as default, click to switch)">
+              Live Cloud (3011)
+            </button>
+          </div>
+
+          <!-- DB Switcher Dropdown & Action -->
+          <div class="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+            <select id="select-db" class="bg-transparent text-xs text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none cursor-pointer">
+              <option value="store_visiting" class="bg-slate-900 text-white">DB: store_visiting (Default)</option>
+              <option value="wordpress_practice" class="bg-slate-900 text-white">DB: wordpress_practice</option>
+              <option value="custom" class="bg-slate-900 text-white">+ Custom DB...</option>
+            </select>
+            <button onclick="handleSwitchDb()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm cursor-pointer">
+              Switch DB
+            </button>
+          </div>
+
+          <!-- Advanced Config Toggle -->
+          <button onclick="toggleAdvancedSettings()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Config
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Advanced Settings -->
+      <div id="advanced-config-panel" class="hidden mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Target Backend API URL</label>
+          <div class="flex gap-2">
+            <input id="api-url-input" type="url" value="http://localhost:4000" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:ring-1 focus:ring-blue-500">
+            <button onclick="saveCustomApiUrl()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold cursor-pointer">Save</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Staff Security Token (x-staff-token)</label>
+          <div class="flex gap-2">
+            <input id="staff-token-input" type="password" value="svt_secret_staff_key_2026" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:ring-1 focus:ring-blue-500">
+            <button onclick="saveStaffToken()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold cursor-pointer">Update</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Connection Test & Latency</label>
+          <button onclick="testConnection()" class="w-full px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+            <span id="ping-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="ping-status-text">Ping Backend Server</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- KPI Overview Cards -->
     <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
       <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -282,9 +364,159 @@
   </div>
 
   <script>
-    const STAFF_TOKEN = 'svt_secret_staff_key_2026';
+    // Environment URLs: Default to Local development URL; Live Cloud ready to switch anytime
+    const LOCAL_API_URL = 'http://localhost:4000';
+    // Live Cloud Server URL (Commented as default, switchable via UI anytime):
+    const LIVE_API_URL = 'https://apps.plestarinc.com:3011';
+
+    let currentApiUrl = localStorage.getItem('staff_api_url') || LOCAL_API_URL;
+    let staffToken = localStorage.getItem('staff_token') || 'svt_secret_staff_key_2026';
     let allStores = [];
     let currentFilter = 'ALL';
+
+    function getApiUrl() {
+      const custom = document.getElementById('api-url-input')?.value?.trim();
+      if (custom) return custom.replace(/\/+$/, '');
+      return (currentApiUrl || LOCAL_API_URL).replace(/\/+$/, '');
+    }
+
+    function getStaffToken() {
+      const input = document.getElementById('staff-token-input')?.value?.trim();
+      return input || staffToken;
+    }
+
+    function switchEnvironment(targetUrl) {
+      currentApiUrl = targetUrl;
+      localStorage.setItem('staff_api_url', targetUrl);
+      const input = document.getElementById('api-url-input');
+      if (input) input.value = targetUrl;
+      updateEnvButtons();
+      showToast(`Switched API endpoint to: ${targetUrl}`);
+      fetchStaffData();
+      fetchDbStatus();
+    }
+
+    function updateEnvButtons() {
+      const isLocal = currentApiUrl.includes('localhost') || currentApiUrl.includes('127.0.0.1') || currentApiUrl.includes('4000');
+      const btnLocal = document.getElementById('btn-env-local');
+      const btnLive = document.getElementById('btn-env-live');
+      const envBadge = document.getElementById('env-badge');
+
+      if (btnLocal && btnLive && envBadge) {
+        if (isLocal) {
+          btnLocal.className = 'px-3 py-1.5 rounded-lg font-semibold transition bg-blue-600 text-white shadow-sm cursor-pointer';
+          btnLive.className = 'px-3 py-1.5 rounded-lg font-semibold transition text-slate-300 hover:text-white cursor-pointer';
+          envBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+          envBadge.textContent = 'Local Dev Active (4000)';
+        } else {
+          btnLocal.className = 'px-3 py-1.5 rounded-lg font-semibold transition text-slate-300 hover:text-white cursor-pointer';
+          btnLive.className = 'px-3 py-1.5 rounded-lg font-semibold transition bg-amber-600 text-white shadow-sm cursor-pointer';
+          envBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          envBadge.textContent = 'Live Cloud Active (3011)';
+        }
+      }
+    }
+
+    function toggleAdvancedSettings() {
+      const p = document.getElementById('advanced-config-panel');
+      if (p) p.classList.toggle('hidden');
+    }
+
+    function saveCustomApiUrl() {
+      const val = document.getElementById('api-url-input')?.value?.trim();
+      if (!val) return;
+      switchEnvironment(val);
+    }
+
+    function saveStaffToken() {
+      const val = document.getElementById('staff-token-input')?.value?.trim();
+      if (!val) return;
+      staffToken = val;
+      localStorage.setItem('staff_token', val);
+      showToast('Staff authorization token updated.');
+      fetchStaffData();
+    }
+
+    async function fetchDbStatus() {
+      try {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/db-status`, {
+          headers: { 'x-staff-token': getStaffToken() }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.currentDb) {
+            const el = document.getElementById('current-db-name');
+            if (el) el.textContent = data.currentDb;
+            const select = document.getElementById('select-db');
+            if (select) {
+              const opt = Array.from(select.options).find(o => o.value === data.currentDb);
+              if (opt) select.value = data.currentDb;
+            }
+          }
+        }
+      } catch (err) {
+        // Fallback or non-blocking if backend is unreachable
+      }
+    }
+
+    async function handleSwitchDb() {
+      const select = document.getElementById('select-db');
+      let chosenDb = select.value;
+      if (chosenDb === 'custom') {
+        chosenDb = prompt('Enter database name to switch to:', 'store_visiting');
+        if (!chosenDb) return;
+      }
+
+      showToast(`Connecting to database "${chosenDb}"...`);
+      try {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/switch-db`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-staff-token': getStaffToken()
+          },
+          body: JSON.stringify({ db_name: chosenDb })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(data.message || `Switched to database: ${data.database}`);
+          const el = document.getElementById('current-db-name');
+          if (el) el.textContent = data.database;
+          fetchStaffData();
+        } else {
+          showToast(data.error || 'Failed to switch database');
+        }
+      } catch (err) {
+        showToast('Database switch error: ' + err.message);
+      }
+    }
+
+    async function testConnection() {
+      const dot = document.getElementById('ping-status-dot');
+      const text = document.getElementById('ping-status-text');
+      if (text) text.textContent = 'Pinging...';
+      if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+      const start = performance.now();
+      try {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/stats`, {
+          headers: { 'x-staff-token': getStaffToken() }
+        });
+        const elapsed = Math.round(performance.now() - start);
+        if (res.ok) {
+          if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          if (text) text.textContent = `Online (${elapsed}ms)`;
+          showToast(`Server responsive in ${elapsed}ms (${getApiUrl()})`);
+        } else {
+          if (dot) dot.className = 'w-2 h-2 rounded-full bg-rose-400';
+          if (text) text.textContent = `HTTP ${res.status}`;
+          showToast(`Server returned HTTP ${res.status}`);
+        }
+      } catch (err) {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        if (text) text.textContent = 'Offline';
+        showToast(`Cannot reach ${getApiUrl()}: ${err.message}`);
+      }
+    }
 
     function showToast(msg) {
       const t = document.getElementById('toast');
@@ -295,8 +527,8 @@
 
     async function fetchStaffData() {
       try {
-        const res = await fetch('/api/v1/internal/admin/stats', {
-          headers: { 'x-staff-token': STAFF_TOKEN }
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/stats`, {
+          headers: { 'x-staff-token': getStaffToken() }
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
@@ -313,7 +545,7 @@
         renderTable();
       } catch (err) {
         document.getElementById('stores-tbody').innerHTML = `
-          <tr><td colspan="6" class="text-center py-12 text-rose-500 font-medium">Failed to connect to database backend: ${err.message}</td></tr>
+          <tr><td colspan="6" class="text-center py-12 text-rose-500 font-medium">Failed to connect to backend at ${getApiUrl()}: ${err.message}</td></tr>
         `;
       }
     }
@@ -384,7 +616,7 @@
               <div class="text-[11px] text-slate-400 mt-0.5">${s.telephone || ''} ${s.official_email ? '&bull; ' + s.official_email : ''}</div>
             </td>
             <td class="py-3.5 px-5 text-right">
-              <button onclick='openEditModal(${storeJson})' class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition flex items-center gap-1 ml-auto">
+              <button onclick='openEditModal(${storeJson})' class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition flex items-center gap-1 ml-auto cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 Modify
               </button>
@@ -433,11 +665,11 @@
       };
 
       try {
-        const res = await fetch('/api/v1/internal/admin/enrich-store', {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/enrich-store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-staff-token': STAFF_TOKEN
+            'x-staff-token': getStaffToken()
           },
           body: JSON.stringify(payload)
         });
@@ -485,11 +717,11 @@
       };
 
       try {
-        const res = await fetch('/api/v1/internal/admin/create-store', {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/create-store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-staff-token': STAFF_TOKEN
+            'x-staff-token': getStaffToken()
           },
           body: JSON.stringify(payload)
         });
@@ -517,8 +749,8 @@
       resEl.innerHTML = '<span class="text-slate-400">Querying WHOIS & reverse DNS...</span>';
 
       try {
-        const res = await fetch('/api/v1/internal/admin/lookup-ip?ip=' + encodeURIComponent(ip), {
-          headers: { 'x-staff-token': STAFF_TOKEN }
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(ip)}`, {
+          headers: { 'x-staff-token': getStaffToken() }
         });
         const data = await res.json();
         resEl.innerHTML = `
@@ -533,7 +765,10 @@
       }
     }
 
+    // Initialize environment buttons and data
+    updateEnvButtons();
     fetchStaffData();
+    fetchDbStatus();
   </script>
 </body>
 </html>

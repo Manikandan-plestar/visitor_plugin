@@ -11,7 +11,7 @@ const dns = require('dns').promises;
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
-const { initDb, getPool, getIsConnected, getCurrentDbName } = require('./db');
+const { initDb, switchDatabase, getPool, getIsConnected, getCurrentDbName } = require('./db');
 const getActiveDbName = () => (typeof getCurrentDbName === 'function' ? getCurrentDbName() : (process.env.DB_NAME || 'store_visiting'));
 
 const app = express();
@@ -770,6 +770,42 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
 // ============================================================================
 // 4. SECURE INTERNAL STAFF API (Protected by x-staff-token)
 // ============================================================================
+
+// Database Status & Diagnostics for Staff Portal
+app.get('/api/v1/internal/admin/db-status', requireStaffAuth, (req, res) => {
+  res.json({
+    success: true,
+    isConnected: getIsConnected(),
+    currentDb: getActiveDbName(),
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: process.env.DB_PORT || '3306',
+    availableDatabases: ['store_visiting', 'wordpress_practice'],
+  });
+});
+
+// Dynamic Database Switcher for Staff Operations
+app.post('/api/v1/internal/admin/switch-db', requireStaffAuth, async (req, res) => {
+  try {
+    const { db_name, host, port, user, password } = req.body;
+    if (typeof switchDatabase !== 'function') {
+      return res.status(500).json({ error: 'Database switching not available.' });
+    }
+    const result = await switchDatabase(db_name, host, port, user, password);
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: `Active database successfully switched to "${result.database}"`,
+        database: result.database,
+        host: result.host,
+        port: result.port,
+      });
+    }
+    return res.status(400).json({ error: result.error || 'Failed to switch database.' });
+  } catch (err) {
+    console.error('Error in /internal/admin/switch-db:', err);
+    res.status(500).json({ error: 'Internal server error switching database.' });
+  }
+});
 app.get('/api/v1/internal/admin/stats', requireStaffAuth, async (req, res) => {
   try {
     if (getIsConnected()) {

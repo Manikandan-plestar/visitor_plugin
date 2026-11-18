@@ -37,6 +37,15 @@ import {
 export default function StaffDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'all-stores' | 'activations' | 'enrichment'
   const [staffKey, setStaffKey] = useState('svt_secret_staff_key_2026');
+
+  // Environment URLs: Default to Local development URL; Live Cloud ready to switch anytime
+  const LOCAL_API_URL = 'http://localhost:4000';
+  // const LIVE_API_URL = 'https://apps.plestarinc.com:3011';
+  const [apiUrl, setApiUrl] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('staff_api_url')) || LOCAL_API_URL;
+  });
+  const [currentDb, setCurrentDb] = useState('store_visiting');
+
   const [kpis, setKpis] = useState({
     total_stores: 0,
     today_activated: 0,
@@ -89,11 +98,47 @@ export default function StaffDashboard() {
     return days;
   }, [stores]);
 
+  const getBaseUrl = () => (apiUrl || LOCAL_API_URL).replace(/\/+$/, '');
+
+  // Fetch Database Status
+  const fetchDbStatus = async () => {
+    try {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/db-status`, {
+        headers: { 'x-staff-token': staffKey },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.currentDb) setCurrentDb(data.currentDb);
+      }
+    } catch (e) {}
+  };
+
+  // Switch Database on the fly
+  const handleSwitchDb = async (newDb) => {
+    try {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/switch-db`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-staff-token': staffKey,
+        },
+        body: JSON.stringify({ db_name: newDb }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCurrentDb(data.database);
+        fetchStaffData();
+      }
+    } catch (e) {
+      console.error('Failed to switch database:', e);
+    }
+  };
+
   // Fetch Data from Central Backend
   const fetchStaffData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/internal/admin/stats', {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/stats`, {
         headers: { 'x-staff-token': staffKey },
       });
       if (res.ok) {
@@ -146,7 +191,7 @@ export default function StaffDashboard() {
     setLookupResult(null);
 
     try {
-      const res = await fetch(`/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(ip)}`, {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(ip)}`, {
         headers: { 'x-staff-token': staffKey },
       });
       if (res.ok) {
@@ -167,7 +212,7 @@ export default function StaffDashboard() {
     if (!selectedStore?.activation_ip) return;
     setLookupLoading(true);
     try {
-      const res = await fetch(`/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(selectedStore.activation_ip)}`, {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(selectedStore.activation_ip)}`, {
         headers: { 'x-staff-token': staffKey },
       });
       if (res.ok) {
@@ -196,7 +241,7 @@ export default function StaffDashboard() {
   const handleBatchAutoEnrich = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/internal/admin/auto-enrich-batch', {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/auto-enrich-batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -285,7 +330,7 @@ export default function StaffDashboard() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/v1/internal/admin/enrich-store', {
+      const res = await fetch(`${getBaseUrl()}/api/v1/internal/admin/enrich-store`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -525,6 +570,63 @@ export default function StaffDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Target Backend Switcher: Local Dev (4000) vs Live Cloud (3011) */}
+            <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setApiUrl('http://localhost:4000');
+                  localStorage.setItem('staff_api_url', 'http://localhost:4000');
+                  fetchStaffData();
+                }}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                  apiUrl.includes('4000') || apiUrl.includes('localhost')
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Local (4000)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setApiUrl('https://apps.plestarinc.com:3011');
+                  localStorage.setItem('staff_api_url', 'https://apps.plestarinc.com:3011');
+                  fetchStaffData();
+                }}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                  apiUrl.includes('3011') || apiUrl.includes('plestarinc')
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Live Cloud URL (Commented as default, click to switch)"
+              >
+                Live (3011)
+              </button>
+            </div>
+
+            {/* Dynamic Database Switcher */}
+            <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200 text-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400">DB:</span>
+              <select
+                value={currentDb}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'custom') {
+                    const custom = window.prompt('Enter database name to switch to:', 'store_visiting');
+                    if (custom) handleSwitchDb(custom);
+                  } else {
+                    handleSwitchDb(val);
+                  }
+                }}
+                className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+              >
+                <option value="store_visiting">store_visiting (Default)</option>
+                <option value="wordpress_practice">wordpress_practice</option>
+                <option value="custom">+ Custom DB...</option>
+              </select>
+            </div>
+
             {/* Status Legend Pill */}
             <div className="hidden md:flex items-center gap-3 text-xs bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700">
               <span className="flex items-center gap-1.5">

@@ -136,6 +136,52 @@ async function seedInitialData() {
   // All telemetry and store records are captured organically in real time.
 }
 
+async function switchDatabase(newDbName, newHost, newPort, newUser, newPassword) {
+  if (!newDbName) {
+    return { success: false, error: 'Database name is required.' };
+  }
+
+  const targetConfig = {
+    host: newHost || process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(newPort || process.env.DB_PORT || '3306', 10),
+    user: newUser || process.env.DB_USER || 'root',
+    password: newPassword !== undefined ? newPassword : (process.env.DB_PASSWORD || ''),
+    database: newDbName,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  };
+
+  try {
+    const newPool = mysql.createPool(targetConfig);
+    const conn = await newPool.getConnection();
+    const [dbResult] = await conn.query('SELECT DATABASE() AS current_db');
+    const confirmedDb = dbResult[0]?.current_db || targetConfig.database;
+    conn.release();
+
+    if (pool) {
+      try { await pool.end(); } catch (e) {}
+    }
+
+    pool = newPool;
+    currentDbName = confirmedDb;
+    isConnected = true;
+
+    await createTables();
+
+    console.log(`🔄 Switched active database to "${currentDbName}" at ${targetConfig.host}:${targetConfig.port}`);
+    return {
+      success: true,
+      database: currentDbName,
+      host: targetConfig.host,
+      port: targetConfig.port,
+    };
+  } catch (err) {
+    console.error(`❌ Failed to switch database to "${newDbName}":`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 function getPool() {
   return pool;
 }
@@ -150,6 +196,7 @@ function getCurrentDbName() {
 
 module.exports = {
   initDb,
+  switchDatabase,
   getPool,
   getIsConnected,
   getCurrentDbName,

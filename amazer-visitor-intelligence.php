@@ -48,8 +48,9 @@ function amazer_via_get_api_url() {
         return 'http://localhost:4000';
     }
 
-    // Live Cloud Backend Default
-    return 'https://apps.plestarinc.com:3011';
+    // Live Cloud Backend (Commented out during active development; uncomment to switch to live cloud)
+    // return 'https://apps.plestarinc.com:3011';
+    return 'http://localhost:4000';
 }
 
 /**
