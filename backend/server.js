@@ -18,6 +18,32 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const STAFF_SECRET_KEY = process.env.STAFF_SECRET_KEY || 'svt_secret_staff_key_2026';
 
+// Helper: Parse single Master Switch from config.php (AMAZER_ENVIRONMENT: 'local' | 'live')
+function getMasterConfig() {
+  const configPath = path.join(__dirname, '..', 'config.php');
+  let environment = 'local';
+  let localUrl = 'http://localhost:4000';
+  let liveUrl = 'https://apps.plestarinc.com:3011';
+
+  try {
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const envMatch = content.match(/define\s*\(\s*['"]AMAZER_ENVIRONMENT['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i);
+      const localMatch = content.match(/define\s*\(\s*['"]AMAZER_LOCAL_API_URL['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i);
+      const liveMatch = content.match(/define\s*\(\s*['"]AMAZER_LIVE_API_URL['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i);
+
+      if (envMatch && envMatch[1]) environment = envMatch[1].toLowerCase().trim();
+      if (localMatch && localMatch[1]) localUrl = localMatch[1].trim();
+      if (liveMatch && liveMatch[1]) liveUrl = liveMatch[1].trim();
+    }
+  } catch (e) {
+    console.warn('Could not parse config.php:', e.message);
+  }
+
+  const activeUrl = environment === 'live' ? liveUrl : localUrl;
+  return { environment, activeUrl, localUrl, liveUrl };
+}
+
 // In-Memory Reverse-IP & Geolocation Cache
 const ipEnrichmentCache = new Map();
 
@@ -1041,12 +1067,28 @@ app.post('/api/v1/internal/admin/auto-enrich-batch', requireStaffAuth, async (re
 // ============================================================================
 // 5. SERVE DEDICATED FRONTEND UI FILE & LEGAL DISCLOSURES
 // ============================================================================
+// Expose Master Environment Configuration to Staff & Client UIs
+app.get('/api/v1/config', (req, res) => {
+  res.json(getMasterConfig());
+});
+
 app.get('/staff-portal', (req, res) => {
   const file1 = path.join(__dirname, 'public', 'staff-portal.html');
   const file2 = path.join(__dirname, 'staff-portal.html');
-  if (require('fs').existsSync(file1)) return res.sendFile(file1);
-  if (require('fs').existsSync(file2)) return res.sendFile(file2);
-  res.sendFile(file1);
+  const targetFile = fs.existsSync(file1) ? file1 : (fs.existsSync(file2) ? file2 : null);
+
+  if (!targetFile) return res.status(404).send('Staff Portal file not found.');
+
+  try {
+    let html = fs.readFileSync(targetFile, 'utf8');
+    const masterConfig = getMasterConfig();
+    const injection = `<script>window.AMAZER_CONFIG = ${JSON.stringify(masterConfig)};</script>`;
+    html = html.replace('</head>', `${injection}\n</head>`);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    return res.sendFile(targetFile);
+  }
 });
 
 // Terms of Service (WordPress.org SaaS Compliance)

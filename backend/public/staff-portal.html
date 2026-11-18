@@ -28,15 +28,16 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          Live Database Connected
+        <!-- Master Environment Status (Driven by config.php) -->
+        <span id="master-env-badge" class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+          <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          <span id="master-env-text">Mode: Local Dev (4000)</span>
         </span>
-        <button onclick="openCreateModal()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition flex items-center gap-1.5">
+        <button onclick="openCreateModal()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition flex items-center gap-1.5 cursor-pointer">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Add New Company / Store
         </button>
-        <button onclick="fetchStaffData()" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5">
+        <button onclick="fetchStaffData()" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 cursor-pointer">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           Refresh
         </button>
@@ -282,9 +283,50 @@
   </div>
 
   <script>
+    // Master Config: Injected directly from config.php by server.js or fetched dynamically
+    const masterConfig = window.AMAZER_CONFIG || {
+      environment: 'local',
+      activeUrl: 'http://localhost:4000',
+      localUrl: 'http://localhost:4000',
+      liveUrl: 'https://apps.plestarinc.com:3011'
+    };
+
+    let currentApiUrl = masterConfig.activeUrl || '';
     const STAFF_TOKEN = 'svt_secret_staff_key_2026';
     let allStores = [];
     let currentFilter = 'ALL';
+
+    function getApiUrl() {
+      return (currentApiUrl || '').replace(/\/+$/, '');
+    }
+
+    function updateEnvBadge(env) {
+      const badge = document.getElementById('master-env-badge');
+      const text = document.getElementById('master-env-text');
+      if (!badge || !text) return;
+      if (env === 'live') {
+        badge.className = 'inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200';
+        text.textContent = 'Mode: Live Cloud (3011)';
+      } else {
+        badge.className = 'inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200';
+        text.textContent = 'Mode: Local Dev (4000)';
+      }
+    }
+
+    async function loadMasterConfig() {
+      try {
+        const res = await fetch('/api/v1/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg && cfg.activeUrl) {
+            currentApiUrl = cfg.activeUrl;
+            updateEnvBadge(cfg.environment);
+          }
+        }
+      } catch (e) {
+        updateEnvBadge(masterConfig.environment);
+      }
+    }
 
     function showToast(msg) {
       const t = document.getElementById('toast');
@@ -295,7 +337,7 @@
 
     async function fetchStaffData() {
       try {
-        const res = await fetch('/api/v1/internal/admin/stats', {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/stats`, {
           headers: { 'x-staff-token': STAFF_TOKEN }
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -433,7 +475,7 @@
       };
 
       try {
-        const res = await fetch('/api/v1/internal/admin/enrich-store', {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/enrich-store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -485,7 +527,7 @@
       };
 
       try {
-        const res = await fetch('/api/v1/internal/admin/create-store', {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/create-store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -517,7 +559,7 @@
       resEl.innerHTML = '<span class="text-slate-400">Querying WHOIS & reverse DNS...</span>';
 
       try {
-        const res = await fetch('/api/v1/internal/admin/lookup-ip?ip=' + encodeURIComponent(ip), {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/lookup-ip?ip=${encodeURIComponent(ip)}`, {
           headers: { 'x-staff-token': STAFF_TOKEN }
         });
         const data = await res.json();
@@ -533,6 +575,8 @@
       }
     }
 
+    updateEnvBadge(masterConfig.environment);
+    loadMasterConfig();
     fetchStaffData();
   </script>
 </body>
