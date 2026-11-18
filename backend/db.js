@@ -26,7 +26,8 @@ function getDbConfig(dbName) {
 }
 
 async function initDb() {
-  const targetDbs = process.env.DB_NAME ? [process.env.DB_NAME] : ['store_visiting', 'wordpress_practice'];
+  const primaryDb = process.env.DB_NAME || 'store_visiting';
+  const targetDbs = Array.from(new Set([primaryDb, 'store_visiting', 'wordpress_practice']));
   let lastError = null;
 
   for (const dbName of targetDbs) {
