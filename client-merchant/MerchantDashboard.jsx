@@ -21,7 +21,6 @@ import TrafficTab from './pages/TrafficTab';
 import FirmographicTab from './pages/FirmographicTab';
 import DemographicTab from './pages/DemographicTab';
 import HighIntentTab from './pages/HighIntentTab';
-import OpportunityTab from './pages/OpportunityTab';
 import ConversionTab from './pages/ConversionTab';
 import SlippedTab from './pages/SlippedTab';
 import SettingsTab from './pages/SettingsTab';
