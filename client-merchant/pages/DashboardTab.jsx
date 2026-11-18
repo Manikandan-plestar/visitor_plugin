@@ -17,8 +17,96 @@ import {
   Share2,
   Compass,
   ArrowUpRight,
+  Calendar,
+  Filter,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation } from './TrafficTab';
+
+// Helper to safely parse hit timestamp
+const parseHitTimestamp = (hit) => {
+  if (!hit) return null;
+  const raw = hit.visited_at || hit.date_time || hit.created_at || hit.timestamp;
+  if (!raw) return null;
+  if (typeof raw === 'number') {
+    return raw < 1e11 ? raw * 1000 : raw;
+  }
+  const parsed = new Date(raw).getTime();
+  if (!isNaN(parsed)) return parsed;
+
+  if (typeof raw === 'string') {
+    const lower = raw.toLowerCase();
+    const now = new Date();
+    if (lower.includes('today')) {
+      return now.getTime();
+    }
+    if (lower.includes('yesterday')) {
+      return now.getTime() - 86400000;
+    }
+  }
+  return null;
+};
+
+// Helper to check if a hit falls within the selected date filter
+const isHitInRange = (hit, filter, customStart, customEnd) => {
+  if (filter === 'all') return true;
+  const ts = parseHitTimestamp(hit);
+  if (!ts) return true; // Keep record if timestamp is not determinable
+
+  const now = new Date();
+
+  if (filter === 'today') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endOfToday = startOfToday + 86400000;
+    return ts >= startOfToday && ts < endOfToday;
+  }
+
+  if (filter === 'yesterday') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 86400000;
+    return ts >= startOfYesterday && ts < startOfToday;
+  }
+
+  if (filter === '7d') {
+    const startOf7d = now.getTime() - 7 * 86400000;
+    return ts >= startOf7d && ts <= now.getTime();
+  }
+
+  if (filter === '14d') {
+    const startOf14d = now.getTime() - 14 * 86400000;
+    return ts >= startOf14d && ts <= now.getTime();
+  }
+
+  if (filter === '30d') {
+    const startOf30d = now.getTime() - 30 * 86400000;
+    return ts >= startOf30d && ts <= now.getTime();
+  }
+
+  if (filter === 'custom') {
+    if (!customStart && !customEnd) return true;
+    let match = true;
+    if (customStart) {
+      const s = new Date(customStart + 'T00:00:00').getTime();
+      if (!isNaN(s) && ts < s) match = false;
+    }
+    if (customEnd) {
+      const e = new Date(customEnd + 'T23:59:59.999').getTime();
+      if (!isNaN(e) && ts > e) match = false;
+    }
+    return match;
+  }
+
+  return true;
+};
+
+const FILTER_OPTIONS = [
+  { id: 'all', label: 'All Time' },
+  { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: '7d', label: 'Last 7 Days' },
+  { id: '14d', label: 'Last 14 Days' },
+  { id: '30d', label: 'Last 30 Days' },
+  { id: 'custom', label: 'Custom Range' },
+];
 
 export default function DashboardTab({
   companies = [],
@@ -31,6 +119,9 @@ export default function DashboardTab({
   onNavigateTab,
 }) {
   const [timeRange, setTimeRange] = useState('14d');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Normalize configured target URLs
   const normalizedHighIntentUrls = useMemo(() => {
@@ -43,12 +134,42 @@ export default function DashboardTab({
     return raw.map((u) => u.trim().toLowerCase()).filter(Boolean);
   }, [conversionUrls]);
 
+  // Filter companies and general visitors based on selected date filter
+  const filteredCompanies = useMemo(() => {
+    if (dateFilter === 'all') return companies;
+    return companies
+      .map((c) => {
+        const visits = c.page_visits || [];
+        const hits = c.hits || [];
+        const matchedVisits = visits.filter((h) => isHitInRange(h, dateFilter, customStartDate, customEndDate));
+        const matchedHits = hits.filter((h) => isHitInRange(h, dateFilter, customStartDate, customEndDate));
+
+        if (matchedVisits.length === 0 && matchedHits.length === 0) {
+          return null;
+        }
+
+        return {
+          ...c,
+          page_visits: matchedVisits.length > 0 ? matchedVisits : matchedHits,
+          hits: matchedHits.length > 0 ? matchedHits : matchedVisits,
+          total_visits: matchedVisits.length || matchedHits.length,
+          total_page_views: matchedVisits.length || matchedHits.length,
+        };
+      })
+      .filter(Boolean);
+  }, [companies, dateFilter, customStartDate, customEndDate]);
+
+  const filteredGeneralVisitors = useMemo(() => {
+    if (dateFilter === 'all') return generalVisitors;
+    return generalVisitors.filter((g) => isHitInRange(g, dateFilter, customStartDate, customEndDate));
+  }, [generalVisitors, dateFilter, customStartDate, customEndDate]);
+
   // Aggregate hits by unique IP address to accurately distinguish New vs Returning visitors
   const ipStats = useMemo(() => {
     const map = new Map();
 
-    // 1. Corporate hits
-    companies.forEach((c) => {
+    // 1. Corporate hits from filtered companies
+    filteredCompanies.forEach((c) => {
       (c.page_visits || []).forEach((hit) => {
         const ip = hit.visitor_ip || c.activation_ip || 'Unknown';
         if (!map.has(ip)) {
@@ -76,8 +197,8 @@ export default function DashboardTab({
       });
     });
 
-    // 2. General consumer hits
-    generalVisitors.forEach((gen) => {
+    // 2. General consumer hits from filtered general visitors
+    filteredGeneralVisitors.forEach((gen) => {
       const ip = gen.visitor_ip || 'Unknown';
       if (!map.has(ip)) {
         map.set(ip, {
@@ -104,11 +225,11 @@ export default function DashboardTab({
     });
 
     return Array.from(map.values());
-  }, [companies, generalVisitors]);
+  }, [filteredCompanies, filteredGeneralVisitors]);
 
-  // Calculate accurate KPI values
+  // Calculate accurate KPI values based on filtered data
   const totalVisitorsCount = ipStats.length;
-  const totalHitsCount = allHits.length || ipStats.reduce((s, r) => s + r.totalHits, 0);
+  const totalHitsCount = ipStats.reduce((s, r) => s + r.totalHits, 0);
   const newVisitorsCount = ipStats.filter((r) => r.totalHits <= 1).length;
   const returningVisitorsCount = ipStats.filter((r) => r.totalHits > 1).length;
   const totalPageViewsCount = totalHitsCount;
@@ -135,9 +256,9 @@ export default function DashboardTab({
     }).length;
   }, [ipStats, normalizedConversionUrls]);
 
-  const totalIdentifiedCompanies = companies.length;
+  const totalIdentifiedCompanies = filteredCompanies.length;
 
-  // Storefront Activity: 14-day daily hit volume trend
+  // Traffic Logs: 14-day daily hit volume trend
   const trafficDays = useMemo(() => {
     const days = 14;
     const result = [];
@@ -153,6 +274,23 @@ export default function DashboardTab({
   }, [allHits]);
 
   const maxDailyCount = Math.max(...trafficDays.map((d) => d.count), 5);
+
+  // Filter summary description text
+  const filterSummaryText = useMemo(() => {
+    if (dateFilter === 'all') return 'All Time Telemetry';
+    if (dateFilter === 'today') return 'Today';
+    if (dateFilter === 'yesterday') return 'Yesterday';
+    if (dateFilter === '7d') return 'Last 7 Days';
+    if (dateFilter === '14d') return 'Last 14 Days';
+    if (dateFilter === '30d') return 'Last 30 Days';
+    if (dateFilter === 'custom') {
+      if (customStartDate && customEndDate) return `${customStartDate} to ${customEndDate}`;
+      if (customStartDate) return `Since ${customStartDate}`;
+      if (customEndDate) return `Until ${customEndDate}`;
+      return 'Custom Range';
+    }
+    return 'Filtered';
+  }, [dateFilter, customStartDate, customEndDate]);
 
   // 1. Country Source Breakdown
   const countrySourceBreakdown = useMemo(() => {
@@ -217,16 +355,16 @@ export default function DashboardTab({
   }, [ipStats]);
 
   return (
-    <div className="space-y-6 w-full max-w-full overflow-hidden">
+    <div className="space-y-6 w-full max-w-full">
       {/* ======================================================================= */}
-      {/* A. Storefront Activity Section (Full Available Content Width at Top)    */}
+      {/* A. Traffic Logs Section (Full Available Content Width at Top)           */}
       {/* ======================================================================= */}
-      <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
+      <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-blue-600" />
-              <span>Storefront Activity</span>
+              <span>Traffic Logs</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Daily visitor telemetry and request volume over the past 14 days
@@ -238,16 +376,29 @@ export default function DashboardTab({
           </div>
         </div>
 
-        {/* Full-Width SVG Bar / Activity Visualization */}
-        <div className="mt-6 w-full overflow-hidden">
-          <div className="h-48 sm:h-56 flex items-end justify-between gap-1 sm:gap-2.5 pt-6 pb-2 w-full">
+        {/* Full-Width Bar / Activity Visualization with fixed, unclipped tooltips */}
+        <div className="mt-4 w-full pt-6">
+          <div className="h-48 sm:h-56 flex items-end justify-between gap-1 sm:gap-2.5 pt-8 pb-2 w-full">
             {trafficDays.map((day, idx) => {
               const heightPct = day.count > 0 ? Math.max(16, Math.round((day.count / maxDailyCount) * 100)) : 6;
+              const tooltipAlign =
+                idx === 0
+                  ? 'left-0'
+                  : idx === trafficDays.length - 1
+                  ? 'right-0'
+                  : 'left-1/2 -translate-x-1/2';
+
               return (
                 <div key={idx} className="flex-1 min-w-0 flex flex-col items-center h-full justify-end group relative">
-                  {/* Tooltip on hover */}
-                  <div className="opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity absolute -top-9 bg-slate-900 text-white text-[11px] font-mono py-1 px-2 rounded-lg whitespace-nowrap shadow-md z-20">
-                    {day.date}: {day.count} {day.count === 1 ? 'hit' : 'hits'}
+                  {/* Tooltip on hover - Unclipped and crisp */}
+                  <div
+                    className={`opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 absolute -top-8 ${tooltipAlign} bg-slate-900 text-white text-[11px] font-mono py-1.5 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-30 border border-slate-700/60 flex items-center gap-1.5`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
+                    <span>{day.date}:</span>
+                    <span className="font-bold text-blue-300">
+                      {day.count} {day.count === 1 ? 'hit' : 'hits'}
+                    </span>
                   </div>
 
                   {/* Volume Bar */}
@@ -274,7 +425,90 @@ export default function DashboardTab({
       </div>
 
       {/* ======================================================================= */}
-      {/* B. Seven Compact Analytics Summary Cards                               */}
+      {/* B. Date Range Filter Toolbar (Controls all values below)                */}
+      {/* ======================================================================= */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Analytics Date Filter
+                </span>
+                <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                  {filterSummaryText}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                All visitor metrics, conversion counts, and breakdowns below are computed for this date range
+              </p>
+            </div>
+          </div>
+
+          {/* Preset Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 self-start lg:self-auto">
+            {FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setDateFilter(opt.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  dateFilter === opt.id
+                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Custom Date Pickers when 'custom' is active */}
+        {dateFilter === 'custom' && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4 bg-slate-50/60 p-3 rounded-xl">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <span>From:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <span>To:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+              />
+            </div>
+            {(customStartDate || customEndDate) && (
+              <button
+                onClick={() => {
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline"
+              >
+                Reset Dates
+              </button>
+            )}
+            <span className="text-[11px] text-slate-400 ml-auto">
+              {totalHitsCount} {totalHitsCount === 1 ? 'hit' : 'hits'} matching custom range
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ======================================================================= */}
+      {/* C. Seven Compact Analytics Summary Cards                                */}
       {/* ======================================================================= */}
       <div>
         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
