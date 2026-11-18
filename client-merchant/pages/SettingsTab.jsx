@@ -43,7 +43,7 @@ export default function SettingsTab({
   const [slpSaved, setSlpSaved] = useState(false);
   const [slpSaving, setSlpSaving] = useState(false);
 
-  const [apiUrl, setApiUrl] = useState(wpSettings.apiUrl || 'https://apps.plestarinc.com:3011');
+  const [apiUrl, setApiUrl] = useState(wpSettings.apiUrl || 'http://localhost:4000');
   const [apiSaved, setApiSaved] = useState(false);
   const [apiSaving, setApiSaving] = useState(false);
 
@@ -321,9 +321,20 @@ export default function SettingsTab({
 
         <form onSubmit={handleSaveApi} className="space-y-4 pt-1">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Backend API URL:
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700">
+                Backend API URL:
+              </label>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes('4000'))
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {(apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes('4000'))
+                  ? 'Active Mode: LOCAL DEV (4000)'
+                  : 'Active Mode: LIVE CLOUD (3011)'}
+              </span>
+            </div>
             <input
               type="url"
               value={apiUrl}
@@ -333,7 +344,7 @@ export default function SettingsTab({
               required
             />
             <span className="text-[11px] text-slate-400 mt-1 block">
-              Default live cloud server: <code>https://apps.plestarinc.com:3011</code> (or <code>http://localhost:4000</code> for local development).
+              Configured via <code className="text-slate-600 font-bold">config.php</code> (Master switch: <code>'local'</code> or <code>'live'</code>).
             </span>
           </div>
 

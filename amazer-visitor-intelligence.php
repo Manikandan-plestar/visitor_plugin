@@ -23,12 +23,17 @@ define( 'AMAZER_VIA_PLUGIN_FILE', __FILE__ );
 define( 'AMAZER_VIA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AMAZER_VIA_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+// Load Central Environment Master Configuration (Switch local vs live in config.php)
+if ( file_exists( AMAZER_VIA_PLUGIN_DIR . 'config.php' ) ) {
+    require_once AMAZER_VIA_PLUGIN_DIR . 'config.php';
+}
+
 /**
  * Helper to retrieve Central Backend API URL.
- * Supports override via constant AMAZER_VIA_CENTRAL_API_URL in wp-config.php,
- * otherwise falls back to WordPress option or local dev default.
+ * Reads environment from config.php ('local' vs 'live'), with optional wp-config.php constant override.
  */
 function amazer_via_get_api_url() {
+    // 1. Manual override via wp-config.php constant if explicitly defined
     if ( defined( 'AMAZER_VIA_CENTRAL_API_URL' ) && ! empty( AMAZER_VIA_CENTRAL_API_URL ) ) {
         return untrailingslashit( esc_url_raw( AMAZER_VIA_CENTRAL_API_URL ) );
     }
@@ -37,18 +42,20 @@ function amazer_via_get_api_url() {
         return untrailingslashit( esc_url_raw( SVT_CENTRAL_API_URL ) );
     }
 
-    $saved_option = get_option( 'amazer_via_central_api_url' );
-    if ( ! empty( $saved_option ) ) {
-        return untrailingslashit( esc_url_raw( $saved_option ) );
+    // 2. Single Master Switch from config.php: 'local' => 4000, 'live' => 3011
+    if ( defined( 'AMAZER_ENVIRONMENT' ) ) {
+        if ( strtolower( AMAZER_ENVIRONMENT ) === 'live' ) {
+            return defined( 'AMAZER_LIVE_API_URL' ) ? AMAZER_LIVE_API_URL : 'https://apps.plestarinc.com:3011';
+        }
+        return defined( 'AMAZER_LOCAL_API_URL' ) ? AMAZER_LOCAL_API_URL : 'http://localhost:4000';
     }
 
-    // Automatically use local backend on localhost, and cloud backend on live websites
+    // 3. Fallback based on host
     $host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '';
     if ( strpos( $host, 'localhost' ) !== false || strpos( $host, '127.0.0.1' ) !== false ) {
         return 'http://localhost:4000';
     }
 
-    // Live Cloud Backend Default
     return 'https://apps.plestarinc.com:3011';
 }
 
@@ -418,6 +425,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'initialTab'          => $initial_tab,
             'storeUrl'            => esc_url( get_site_url() ),
             'apiUrl'              => amazer_via_get_api_url(),
+            'environment'         => defined( 'AMAZER_ENVIRONMENT' ) ? AMAZER_ENVIRONMENT : 'local',
             'siteName'            => get_bloginfo( 'name' ),
             'ajaxUrl'             => admin_url( 'admin-ajax.php' ),
             'nonce'               => wp_create_nonce( 'amazer_via_nonce' ),
