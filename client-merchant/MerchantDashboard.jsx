@@ -484,7 +484,8 @@ export default function MerchantDashboard() {
   const allHits = useMemo(() => {
     const list = [];
     companies.forEach((c) => {
-      (c.hits || []).forEach((h) => list.push({ ...h, isCorporate: true, companyName: c.company_name }));
+      const hitsList = c.page_visits || c.hits || [];
+      hitsList.forEach((h) => list.push({ ...h, isCorporate: true, companyName: c.company_name }));
     });
     combinedGeneralVisitors.forEach((g) => {
       list.push({ ...g, isCorporate: false, companyName: 'General Visitor' });
