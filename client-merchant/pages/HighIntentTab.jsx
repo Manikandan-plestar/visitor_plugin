@@ -23,7 +23,7 @@ import {
   Layers,
   ArrowUpDown,
 } from 'lucide-react';
-import { parseTrafficSource, getIpLocation } from './TrafficTab';
+import { parseTrafficSource, getIpLocation, maskIpAddress } from './TrafficTab';
 
 export default function HighIntentTab({
   companies = [],
@@ -499,21 +499,7 @@ export default function HighIntentTab({
 
                       {/* IP Address */}
                       <td className="py-3.5 px-4 text-left whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-900">{row.ip}</span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(row.ip)}
-                            className="p-0.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                            title="Copy IP"
-                          >
-                            {copiedIp === row.ip ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
+                        <span className="font-mono font-bold text-slate-900">{maskIpAddress(row.ip)}</span>
                         {row.isCorporate && (
                           <span className="text-[10px] text-slate-500 block truncate max-w-[150px]">
                             {row.companyName}

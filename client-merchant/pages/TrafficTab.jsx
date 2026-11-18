@@ -180,16 +180,24 @@ export function getIpLocation(record) {
 }
 
 /**
- * Mask IP address to show first 3 octets with last octet masked as xxx
- * (e.g. 194.138.37.10 -> 194.138.37.xxx)
+ * Mask IP address to show only first 2 octets (~first 6 digits) and hide remaining octets
+ * (e.g. 194.138.37.10 -> 194.138.xxx.xxx)
  */
 export function maskIpAddress(ip) {
   if (!ip) return '';
-  const parts = String(ip).trim().split('.');
+  const trimmed = String(ip).trim();
+  const parts = trimmed.split('.');
   if (parts.length === 4) {
-    return `${parts[0]}.${parts[1]}.${parts[2]}.xxx`;
+    return `${parts[0]}.${parts[1]}.xxx.xxx`;
   }
-  return ip;
+  if (trimmed.includes(':')) {
+    const colons = trimmed.split(':');
+    return `${colons.slice(0, 2).join(':')}:xxxx:xxxx`;
+  }
+  if (trimmed.length > 7) {
+    return trimmed.substring(0, 7) + '...';
+  }
+  return trimmed;
 }
 
 /**
@@ -544,20 +552,8 @@ export default function TrafficTab({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-mono font-black text-slate-900 tracking-tight">
-                    {selectedIpRecord.ip}
+                    {maskIpAddress(selectedIpRecord.ip)}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(selectedIpRecord.ip)}
-                    className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                    title="Copy IP"
-                  >
-                    {copiedIp === selectedIpRecord.ip ? (
-                      <Check className="w-4 h-4 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </button>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -805,28 +801,14 @@ export default function TrafficTab({
                         {sNo}
                       </td>
 
-                      {/* IP Address (Masked with first 3 octets, last octet as xxx) */}
+                      {/* IP Address (Masked with first 6 digits / 2 octets, remaining hidden) */}
                       <td className="py-2.5 px-2 text-left whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <span
-                            className="font-mono font-bold text-slate-800 hover:text-blue-600 transition-colors text-xs"
-                            title={`Full IP: ${row.ip} (Click row to inspect)`}
-                          >
-                            {maskIpAddress(row.ip)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); copyToClipboard(row.ip); }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                            title="Copy full IP"
-                          >
-                            {copiedIp === row.ip ? (
-                              <Check className="w-3 h-3 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </button>
-                        </div>
+                        <span
+                          className="font-mono font-bold text-slate-800 hover:text-blue-600 transition-colors text-xs"
+                          title="Click row to inspect details"
+                        >
+                          {maskIpAddress(row.ip)}
+                        </span>
                       </td>
 
                       {/* Location: Flag + City / Country */}

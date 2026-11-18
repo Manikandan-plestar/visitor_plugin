@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   Store,
 } from 'lucide-react';
+import { maskIpAddress } from './TrafficTab';
 
 export default function SlippedTab() {
   const sampleJourneys = [
@@ -196,7 +197,7 @@ export default function SlippedTab() {
                   </td>
 
                   <td className="py-3.5 px-4">
-                    <span className="font-mono font-bold text-slate-800 block">{j.ip}</span>
+                    <span className="font-mono font-bold text-slate-800 block">{maskIpAddress(j.ip)}</span>
                     <span className="text-[10px] font-mono text-slate-400 block">{j.visitorToken}</span>
                   </td>
 

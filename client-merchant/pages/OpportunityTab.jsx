@@ -15,6 +15,7 @@ import {
   Filter,
   Eye,
 } from 'lucide-react';
+import { maskIpAddress } from './TrafficTab';
 
 export default function OpportunityTab({
   companies = [],
@@ -230,20 +231,7 @@ export default function OpportunityTab({
                     </td>
 
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <span>{opp.ip}</span>
-                        <button
-                          onClick={() => copyToClipboard(opp.ip)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
-                          title="Copy IP"
-                        >
-                          {copiedIp === opp.ip ? (
-                            <Check className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
-                      </div>
+                      <span>{maskIpAddress(opp.ip)}</span>
                     </td>
 
                     <td className="py-3.5 px-4">
