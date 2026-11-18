@@ -43,10 +43,7 @@ export default function SettingsTab({
   const [slpSaved, setSlpSaved] = useState(false);
   const [slpSaving, setSlpSaving] = useState(false);
 
-  // Live Cloud URL (Commented out for development; switchable via input or uncommenting):
-  // const LIVE_API_URL = 'https://apps.plestarinc.com:3011';
-  const LOCAL_DEV_API_URL = 'http://localhost:4000';
-  const [apiUrl, setApiUrl] = useState(wpSettings.apiUrl || LOCAL_DEV_API_URL);
+  const [apiUrl, setApiUrl] = useState(wpSettings.apiUrl || 'https://apps.plestarinc.com:3011');
   const [apiSaved, setApiSaved] = useState(false);
   const [apiSaving, setApiSaving] = useState(false);
 

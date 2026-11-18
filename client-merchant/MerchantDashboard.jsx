@@ -224,9 +224,10 @@ export default function MerchantDashboard() {
   const wpSettings = window.amazerViSettings || window.amazerWhoisSettings || window.svtSettings || {
     storeUrl: 'http://localhost/wordpress_practice',
     apiUrl:
-      // Live Cloud URL (Commented out during active development; uncomment to switch to live cloud):
-      // 'https://apps.plestarinc.com:3011',
-      'http://localhost:4000',
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:4000'
+        : 'https://apps.plestarinc.com:3011',
     siteName: 'My Storefront',
     ajaxUrl: '/wp-admin/admin-ajax.php',
     nonce: '',
