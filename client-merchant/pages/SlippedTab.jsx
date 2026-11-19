@@ -3,105 +3,18 @@ import {
   ShoppingBag,
   TrendingDown,
   Clock,
-  Layers,
-  Sparkles,
-  Info,
-  CheckCircle2,
-  AlertTriangle,
-  HelpCircle,
-  ExternalLink,
-  ShieldAlert,
-  Store,
   Search,
-  Filter,
   Calendar,
   Monitor,
   Smartphone,
   Laptop,
-  ArrowRight,
   Eye,
-  Zap,
   Building2,
-  Globe,
   Share2,
   X,
-  Target,
-  Send,
   SlidersHorizontal,
-  ChevronRight,
-  ArrowUpRight,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation, maskIpAddress } from './TrafficTab';
-
-// Helper to determine the Funnel Stage reached on the merchant's store
-export function getFunnelStage(pages = []) {
-  const pageList = Array.isArray(pages) ? pages : Array.from(pages || []);
-  const lowerPages = pageList.map((p) => String(p || '').toLowerCase());
-
-  if (lowerPages.some((p) => p.includes('checkout') || p.includes('cart') || p.includes('basket'))) {
-    return {
-      stage: 'Cart Abandoned',
-      key: 'cart',
-      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
-      dotClass: 'bg-rose-500',
-      description: 'Added products to cart or reached checkout before leaving',
-      urgency: 'Critical',
-      rank: 4,
-    };
-  }
-
-  if (
-    lowerPages.some(
-      (p) =>
-        p.includes('pricing') ||
-        p.includes('plan') ||
-        p.includes('quote') ||
-        p.includes('contact-sales') ||
-        p.includes('rfq')
-    )
-  ) {
-    return {
-      stage: 'Pricing Evaluator',
-      key: 'pricing',
-      badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
-      dotClass: 'bg-amber-500',
-      description: 'Actively compared pricing models & subscription tiers',
-      urgency: 'High',
-      rank: 3,
-    };
-  }
-
-  if (
-    lowerPages.some(
-      (p) =>
-        p.includes('product') ||
-        p.includes('shop') ||
-        p.includes('solution') ||
-        p.includes('item') ||
-        p.includes('catalog')
-    )
-  ) {
-    return {
-      stage: 'Product Evaluator',
-      key: 'product',
-      badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-      dotClass: 'bg-blue-500',
-      description: 'Examined specific product specs, features, or catalog items',
-      urgency: 'Medium',
-      rank: 2,
-    };
-  }
-
-  return {
-    stage: 'Browsing',
-    key: 'browsing',
-    badgeClass: 'bg-slate-50 text-slate-700 border-slate-200',
-    dotClass: 'bg-slate-400',
-    description: 'General top-of-funnel exploration on homepage or content',
-    urgency: 'Low',
-    rank: 1,
-  };
-}
 
 // Helper to format duration in minutes and seconds
 const formatDwellTime = (seconds) => {
@@ -122,11 +35,9 @@ export default function SlippedTab({
   onNavigateTab,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [stageFilter, setStageFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Build raw slipped candidates from merchant visitors
+  // Build raw slipped records from storefront visitors
   const rawSlippedRecords = useMemo(() => {
     const list = [];
     const now = Date.now();
@@ -137,7 +48,6 @@ export default function SlippedTab({
       if (visits.length === 0) return;
 
       const pages = visits.map((v) => v.page_url || '/');
-      const funnel = getFunnelStage(pages);
 
       // Total dwell time on store
       const totalDwell = visits.reduce(
@@ -159,7 +69,9 @@ export default function SlippedTab({
 
       // Browser & Device
       const browser = lastVisit.browser || 'Chrome 122';
-      const isMobile = browser.toLowerCase().includes('mobile') || browser.toLowerCase().includes('safari') && browser.toLowerCase().includes('iphone');
+      const isMobile =
+        browser.toLowerCase().includes('mobile') ||
+        (browser.toLowerCase().includes('safari') && browser.toLowerCase().includes('iphone'));
       const isTablet = browser.toLowerCase().includes('tablet') || browser.toLowerCase().includes('ipad');
       const deviceType = isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop';
 
@@ -175,21 +87,12 @@ export default function SlippedTab({
         industry: c.industry || 'B2B Commercial Enterprise',
         location: loc.country ? `${loc.city ? loc.city + ', ' : ''}${loc.country}` : 'Global Network',
         countryFlag: loc.flag || '🌐',
-        physicalAddress: c.physical_address,
-        telephone: c.telephone,
-        officialEmail: c.official_email,
-        website: c.website,
         sourceLabel: src.label || 'Direct Navigation',
-        sourceType: src.source || 'Direct',
         sourceBadgeClass: src.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200',
         deviceType,
         browser,
         lastPage,
-        dwellSeconds: totalDwell,
         dwellFormatted: formatDwellTime(totalDwell),
-        funnel,
-        pagesVisited: Array.from(new Set(pages)),
-        visits,
         slippedTimestamp,
         slippedDateStr: new Date(slippedTimestamp).toLocaleDateString('en-US', {
           month: 'short',
@@ -206,9 +109,6 @@ export default function SlippedTab({
     // 2. High-Intent general consumer prospects who engaged deeply
     generalVisitors.forEach((gen, idx) => {
       const page = gen.page_url || '/';
-      const funnel = getFunnelStage([page]);
-
-      // Only include prospects who showed meaningful interest (not quick bounces)
       const dwell = gen.duration_seconds || 85;
       const src = parseTrafficSource(gen.referrer, null);
       const loc = getIpLocation(gen);
@@ -229,21 +129,12 @@ export default function SlippedTab({
         industry: 'Commercial Consumer Prospect',
         location: loc.country ? `${loc.city ? loc.city + ', ' : ''}${loc.country}` : 'United States',
         countryFlag: loc.flag || '🇺🇸',
-        physicalAddress: gen.physical_address,
-        telephone: null,
-        officialEmail: null,
-        website: null,
         sourceLabel: src.label || 'Organic Search',
-        sourceType: src.source || 'Organic Search',
         sourceBadgeClass: src.badgeClass || 'bg-emerald-50 text-emerald-700 border-emerald-200',
         deviceType,
         browser,
         lastPage: page,
-        dwellSeconds: dwell,
         dwellFormatted: formatDwellTime(dwell),
-        funnel,
-        pagesVisited: [page],
-        visits: [gen],
         slippedTimestamp,
         slippedDateStr: new Date(slippedTimestamp).toLocaleDateString('en-US', {
           month: 'short',
@@ -261,7 +152,7 @@ export default function SlippedTab({
     return list.sort((a, b) => b.slippedTimestamp - a.slippedTimestamp);
   }, [companies, generalVisitors]);
 
-  // Apply Search, Funnel Stage, and Date Filters
+  // Apply Search and Date Filters
   const filteredRecords = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const now = Date.now();
@@ -279,14 +170,7 @@ export default function SlippedTab({
         }
       }
 
-      // 2. Funnel Stage Filter
-      if (stageFilter !== 'all') {
-        if (rec.funnel.key !== stageFilter) {
-          return false;
-        }
-      }
-
-      // 3. Date Filter
+      // 2. Date Filter
       if (dateFilter !== 'all') {
         const ts = rec.slippedTimestamp;
         const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
@@ -306,7 +190,7 @@ export default function SlippedTab({
 
       return true;
     });
-  }, [rawSlippedRecords, searchQuery, stageFilter, dateFilter]);
+  }, [rawSlippedRecords, searchQuery, dateFilter]);
 
   // Aggregate Top Metrics
   const totalSlippedCount = filteredRecords.length;
@@ -336,13 +220,6 @@ export default function SlippedTab({
       return { name: 'Desktop', pct: Math.round((desktop / total) * 100), icon: Monitor };
     }
     return { name: 'Mobile', pct: Math.round((mobile / total) * 100), icon: Smartphone };
-  }, [filteredRecords]);
-
-  // High-Value / Bottom-Funnel Deals at Risk (Cart & Pricing)
-  const bottomFunnelCount = useMemo(() => {
-    return filteredRecords.filter(
-      (r) => r.funnel.key === 'cart' || r.funnel.key === 'pricing'
-    ).length;
   }, [filteredRecords]);
 
   return (
@@ -389,9 +266,9 @@ export default function SlippedTab({
       </div>
 
       {/* ======================================================================= */}
-      {/* 2. Four KPI Metric Cards                                                */}
+      {/* 2. Three Clean KPI Metric Cards                                         */}
       {/* ======================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Card 1: Slipped Count */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
@@ -446,108 +323,59 @@ export default function SlippedTab({
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">Hardware platform of lost users</p>
         </div>
-
-        {/* Card 4: Bottom-Funnel Hot Leads (Cart & Pricing) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">
-              Cart & Pricing Leads
-            </span>
-            <span className="p-2 rounded-xl bg-amber-50 text-amber-600 shrink-0">
-              <Zap className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-black text-amber-600">{bottomFunnelCount}</span>
-            <p className="text-[11px] text-amber-800 font-semibold mt-0.5">
-              High purchase-intent shoppers lost
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* ======================================================================= */}
-      {/* 3. Filter & Search Controls Toolbar                                     */}
+      {/* 3. Search & Date Filter Controls Toolbar                                */}
       {/* ======================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search company, masked IP, page URL, or source..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Date Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start lg:self-auto">
-            {[
-              { id: 'all', label: 'All Time' },
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: '7d', label: '7D' },
-              { id: '14d', label: '14D' },
-              { id: '30d', label: '30D' },
-            ].map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setDateFilter(d.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  dateFilter === d.id
-                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* Search Box */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search company, masked IP, page URL, or source..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Funnel Stage Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
-          <span className="text-slate-400 font-semibold flex items-center gap-1.5 mr-1">
-            <Filter className="w-3.5 h-3.5" /> Funnel Stage:
-          </span>
+        {/* Date Filter Tabs */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start lg:self-auto">
           {[
-            { id: 'all', label: 'All Stages' },
-            { id: 'cart', label: '🔴 Cart Abandoned' },
-            { id: 'pricing', label: '🟠 Pricing Evaluator' },
-            { id: 'product', label: '🟡 Product Evaluator' },
-            { id: 'browsing', label: '⚪ Browsing' },
-          ].map((pill) => (
+            { id: 'all', label: 'All Time' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: '7d', label: '7D' },
+            { id: '14d', label: '14D' },
+            { id: '30d', label: '30D' },
+          ].map((d) => (
             <button
-              key={pill.id}
-              onClick={() => setStageFilter(pill.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                stageFilter === pill.id
-                  ? 'bg-slate-900 text-white font-bold shadow-xs'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+              key={d.id}
+              onClick={() => setDateFilter(d.id)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                dateFilter === d.id
+                  ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {pill.label}
+              {d.label}
             </button>
           ))}
-          <span className="text-slate-400 ml-auto font-mono text-[11px]">
-            Showing {filteredRecords.length} of {rawSlippedRecords.length} slipped events
-          </span>
         </div>
       </div>
 
       {/* ======================================================================= */}
-      {/* 4. Slipped Activity Table                                               */}
+      {/* 4. Slipped Activity Table (Clean, Direct, No Action Column)            */}
       {/* ======================================================================= */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
@@ -561,7 +389,7 @@ export default function SlippedTab({
             </p>
           </div>
           <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-            Privacy Protected
+            {filteredRecords.length} Records
           </span>
         </div>
 
@@ -573,30 +401,25 @@ export default function SlippedTab({
                 <th className="py-3 px-4">Prospect Profile</th>
                 <th className="py-3 px-4">Traffic Source</th>
                 <th className="py-3 px-4">Device & Tech</th>
-                <th className="py-3 px-4">Activity on Your Store</th>
-                <th className="py-3 px-4 text-center">Funnel Stage</th>
+                <th className="py-3 px-4">Page Viewed on Your Store</th>
                 <th className="py-3 px-4">Slipped Event</th>
-                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
                     <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     No slipped prospects matching your search or filters.
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((r, idx) => {
-                  const DeviceIcon = r.deviceType === 'Mobile' ? Smartphone : r.deviceType === 'Tablet' ? Laptop : Monitor;
+                  const DeviceIcon =
+                    r.deviceType === 'Mobile' ? Smartphone : r.deviceType === 'Tablet' ? Laptop : Monitor;
 
                   return (
-                    <tr
-                      key={r.id}
-                      onClick={() => setSelectedRecord(r)}
-                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                    >
+                    <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* S.No */}
                       <td className="py-3.5 px-4 text-center font-mono text-slate-400 font-semibold">
                         {idx + 1}
@@ -613,7 +436,7 @@ export default function SlippedTab({
                             {r.isCorporate ? <Building2 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </div>
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate block max-w-[200px]">
+                            <span className="font-bold text-slate-900 truncate block max-w-[200px]">
                               {r.companyName || maskIpAddress(r.ip)}
                             </span>
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 truncate">
@@ -649,7 +472,7 @@ export default function SlippedTab({
                       {/* Activity on Your Store */}
                       <td className="py-3.5 px-4">
                         <div className="space-y-0.5">
-                          <span className="font-mono text-[11px] font-semibold px-2 py-0.5 bg-slate-100 rounded border border-slate-200 truncate block max-w-[180px] text-slate-700">
+                          <span className="font-mono text-[11px] font-semibold px-2 py-0.5 bg-slate-100 rounded border border-slate-200 truncate block max-w-[200px] text-slate-700">
                             {r.lastPage}
                           </span>
                           <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono">
@@ -657,16 +480,6 @@ export default function SlippedTab({
                             {r.dwellFormatted} on site
                           </span>
                         </div>
-                      </td>
-
-                      {/* Funnel Stage */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${r.funnel.badgeClass}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${r.funnel.dotClass}`}></span>
-                          <span>{r.funnel.stage}</span>
-                        </span>
                       </td>
 
                       {/* Slipped Event (Anonymous Network Signal) */}
@@ -686,21 +499,6 @@ export default function SlippedTab({
                           </span>
                         </div>
                       </td>
-
-                      {/* Action */}
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedRecord(r);
-                          }}
-                          className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 transition-colors inline-flex items-center gap-1"
-                        >
-                          <span>Journey</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
@@ -709,187 +507,6 @@ export default function SlippedTab({
           </table>
         </div>
       </div>
-
-      {/* ======================================================================= */}
-      {/* 5. Slide-over Prospect & Journey Drawer                                 */}
-      {/* ======================================================================= */}
-      {selectedRecord && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end animate-fadeIn">
-          <div
-            className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-slideLeft border-l border-slate-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Drawer Header */}
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                  {selectedRecord.isCorporate ? <Building2 className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {selectedRecord.companyName || maskIpAddress(selectedRecord.ip)}
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                    <span>{selectedRecord.countryFlag}</span>
-                    <span>{selectedRecord.location}</span>
-                    <span>•</span>
-                    <span className="font-mono">{maskIpAddress(selectedRecord.ip)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setSelectedRecord(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Drawer Body */}
-            <div className="p-5 space-y-5 flex-1">
-              {/* Attribution Alert Card */}
-              <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    Slipped Conversion Attribution
-                  </span>
-                  <span className="text-[11px] font-mono text-rose-600 font-semibold">
-                    {selectedRecord.slippedDateStr} • {selectedRecord.slippedTimeStr}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-700">
-                  This prospect browsed your catalog, reached the{' '}
-                  <strong className="text-slate-900">{selectedRecord.funnel.stage}</strong> stage, and completed an order or conversion on a monitored competitor storefront within your {slippedWindow} attribution window.
-                </p>
-                <div className="pt-2 text-[11px] text-slate-500 flex items-center gap-2">
-                  <ShieldAlert className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Competitor storefront identity is kept strictly confidential across consortium members.</span>
-                </div>
-              </div>
-
-              {/* Funnel Stage Breakdown */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Funnel Engagement Level
-                </span>
-                <div className="flex items-center justify-between">
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full border ${selectedRecord.funnel.badgeClass}`}>
-                    {selectedRecord.funnel.stage}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-600">
-                    Urgency: <strong className="text-slate-900">{selectedRecord.funnel.urgency}</strong>
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  {selectedRecord.funnel.description}
-                </p>
-              </div>
-
-              {/* Timeline of Pages Viewed on Your Store */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <span>Journey on Your Storefront Prior to Slipped Event</span>
-                </h4>
-
-                <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
-                  {selectedRecord.pagesVisited.map((page, pIdx) => (
-                    <div key={pIdx} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
-                          {pIdx + 1}
-                        </span>
-                        <span className="font-mono text-slate-800 font-semibold truncate max-w-[320px]">
-                          {page}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 shrink-0 font-mono">
-                        {pIdx === selectedRecord.pagesVisited.length - 1 ? 'Exit Page' : 'Step ' + (pIdx + 1)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Acquisition & Tech Details */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Acquisition Channel
-                  </span>
-                  <span className="font-semibold text-slate-800 mt-1 block">
-                    {selectedRecord.sourceLabel}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Hardware & Browser
-                  </span>
-                  <span className="font-semibold text-slate-800 mt-1 block truncate">
-                    {selectedRecord.deviceType} • {selectedRecord.browser}
-                  </span>
-                </div>
-              </div>
-
-              {/* Recommended Win-back Playbook */}
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl space-y-2.5">
-                <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <Target className="w-4 h-4 text-blue-600" />
-                  <span>Recommended Win-Back Action Playbook</span>
-                </h4>
-                <p className="text-xs text-blue-900 leading-relaxed">
-                  Since this account engaged with <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200 font-mono text-[11px]">{selectedRecord.lastPage}</code>, launch a targeted win-back re-engagement campaign:
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {selectedRecord.officialEmail && selectedRecord.officialEmail !== '--' && (
-                    <a
-                      href={`mailto:${selectedRecord.officialEmail}?subject=Special inquiry offer for ${selectedRecord.companyName}`}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors flex items-center gap-1.5"
-                    >
-                      <Send className="w-3 h-3" /> Email Lead
-                    </a>
-                  )}
-                  {selectedRecord.website && selectedRecord.website !== '#' && (
-                    <a
-                      href={selectedRecord.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1"
-                    >
-                      <span>Visit Website</span>
-                      <ArrowUpRight className="w-3 h-3" />
-                    </a>
-                  )}
-                  <button
-                    onClick={() => {
-                      alert(`Win-back alert queued for ${selectedRecord.companyName || selectedRecord.ip}. Retargeting pixel updated.`);
-                    }}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Trigger 10% Win-Back Discount</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Drawer Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-mono">
-                Prospect Token: {selectedRecord.id}
-              </span>
-              <button
-                onClick={() => setSelectedRecord(null)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Close Drawer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
