@@ -21,6 +21,7 @@ export default function SettingsTab({
   opportunityDuration = 60,
   slippedEnabled = true,
   slippedWindow = '48h',
+  competitorUrls = '',
   trackingEnabled = false,
   onSaveAnalyticsUrls,
   onSaveOpportunitySettings,
@@ -40,6 +41,9 @@ export default function SettingsTab({
 
   const [slpEnabled, setSlpEnabled] = useState(slippedEnabled);
   const [slpWindow, setSlpWindow] = useState(slippedWindow);
+  const [compUrls, setCompUrls] = useState(
+    competitorUrls || wpSettings.competitorUrls || ''
+  );
   const [slpSaved, setSlpSaved] = useState(false);
   const [slpSaving, setSlpSaving] = useState(false);
 
@@ -72,7 +76,7 @@ export default function SettingsTab({
     setSlpSaved(false);
     try {
       if (onSaveSlippedSettings) {
-        await onSaveSlippedSettings(slpEnabled, slpWindow);
+        await onSaveSlippedSettings(slpEnabled, slpWindow, compUrls);
       }
       setSlpSaved(true);
       setTimeout(() => setSlpSaved(false), 3000);
@@ -224,84 +228,99 @@ export default function SettingsTab({
         </form>
       </div>
 
-      {/*
-        2. Slipped Settings Card (Commented out for now; to be enabled in a future release)
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2.5">
-              <span className="p-2 bg-orange-100 text-orange-700 rounded-xl">
-                <ShoppingBag className="w-4 h-4" />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Slipped Cross-Store Tracking Configuration</h3>
-                <p className="text-xs text-slate-500">
-                  Configure attribution windows and consortium journey detection parameters.
-                </p>
-              </div>
+      {/* 2. Slipped Settings Card */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 bg-orange-100 text-orange-700 rounded-xl">
+              <ShoppingBag className="w-4 h-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Slipped Cross-Store Tracking Configuration</h3>
+              <p className="text-xs text-slate-500">
+                Configure competitor watchlist and anonymous cross-store conversion detection parameters.
+              </p>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded-full uppercase">
-              Preview
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full uppercase">
+            Active
+          </span>
+        </div>
+
+        <form onSubmit={handleSaveSlp} className="space-y-4 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Cross-Store Consortium Participation:
+              </label>
+              <select
+                value={slpEnabled ? 'yes' : 'no'}
+                onChange={(e) => setSlpEnabled(e.target.value === 'yes')}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
+              >
+                <option value="yes">Enabled (Detect Multi-Store Journeys)</option>
+                <option value="no">Disabled (Single-Storefront Only)</option>
+              </select>
+              <span className="text-[11px] text-slate-400 mt-1 block">
+                Correlates anonymous IP & visitor touchpoints across competitor stores without disclosing identities.
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Attribution Tracking Window:
+              </label>
+              <select
+                value={slpWindow}
+                onChange={(e) => setSlpWindow(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
+              >
+                <option value="24h">24 Hours (Fast-Cycle Retail)</option>
+                <option value="48h">48 Hours (Standard B2B / eCommerce)</option>
+                <option value="7d">7 Days (Longer Procurement Evaluation)</option>
+                <option value="14d">14 Days (Enterprise RFQ Cycles)</option>
+              </select>
+              <span className="text-[11px] text-slate-400 mt-1 block">
+                Maximum elapsed time between initial catalog visit on your store and external checkout.
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Monitored Competitor Store URLs:
+            </label>
+            <textarea
+              rows={2}
+              value={compUrls}
+              onChange={(e) => setCompUrls(e.target.value)}
+              placeholder="https://competitor-b.com, https://competitor-c.com, https://rival-store.net"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500 focus:bg-white"
+            />
+            <span className="text-[11px] text-slate-400 mt-1 block">
+              Comma-separated URLs of competitor storefronts. When a prospect visits your store and later converts on any of these endpoints, an anonymous Slipped event is logged in your Slipped tab.
             </span>
           </div>
 
-          <form onSubmit={handleSaveSlp} className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Cross-Store Consortium Participation:
-                </label>
-                <select
-                  value={slpEnabled ? 'yes' : 'no'}
-                  onChange={(e) => setSlpEnabled(e.target.value === 'yes')}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
-                >
-                  <option value="yes">Enabled (Detect Multi-Store Journeys)</option>
-                  <option value="no">Disabled (Single-Storefront Only)</option>
-                </select>
-                <span className="text-[11px] text-slate-400 mt-1 block">
-                  Correlates anonymous IP & user-agent touchpoints across partner stores.
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Attribution Tracking Window:
-                </label>
-                <select
-                  value={slpWindow}
-                  onChange={(e) => setSlpWindow(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
-                >
-                  <option value="24h">24 Hours (Fast-Cycle Retail)</option>
-                  <option value="48h">48 Hours (Standard B2B / eCommerce)</option>
-                  <option value="7d">7 Days (Longer Procurement Evaluation)</option>
-                </select>
-                <span className="text-[11px] text-slate-400 mt-1 block">
-                  Maximum elapsed time between initial catalog visit and third-party checkout.
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2">
-              {slpSaved ? (
-                <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                  <Check className="w-4 h-4" /> Slipped journey preferences saved!
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Settings save to WordPress options</span>
-              )}
-              <button
-                type="submit"
-                disabled={slpSaving}
-                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {slpSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                {slpSaving ? 'Saving...' : 'Save Slipped Preferences'}
-              </button>
-            </div>
-          </form>
-        </div>
-      */}
+          <div className="flex items-center justify-between pt-2">
+            {slpSaved ? (
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <Check className="w-4 h-4" /> Slipped journey preferences saved!
+              </span>
+            ) : (
+              <span className="text-xs text-slate-400">Settings save to WordPress options</span>
+            )}
+            <button
+              type="submit"
+              disabled={slpSaving}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {slpSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {slpSaving ? 'Saving...' : 'Save Slipped Preferences'}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* 3. API Server Endpoint Configuration */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">

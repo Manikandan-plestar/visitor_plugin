@@ -235,6 +235,7 @@ export default function MerchantDashboard() {
     conversionUrls: '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout',
     slippedEnabled: 'yes',
     slippedWindow: '48h',
+    competitorUrls: '',
   };
 
   // Helper to determine initial tab from URL or localized settings
@@ -331,6 +332,7 @@ export default function MerchantDashboard() {
   );
   const [slippedEnabled, setSlippedEnabled] = useState(wpSettings.slippedEnabled !== 'no');
   const [slippedWindow, setSlippedWindow] = useState(wpSettings.slippedWindow || '48h');
+  const [competitorUrls, setCompetitorUrls] = useState(wpSettings.competitorUrls || '');
 
   // Time & Duration Formatting Helpers
   const formatDuration = (totalSeconds) => {
@@ -552,14 +554,16 @@ export default function MerchantDashboard() {
   };
 
   // Handler: Save Slipped Settings
-  const handleSaveSlippedSettings = async (enabled, window) => {
+  const handleSaveSlippedSettings = async (enabled, window, compUrls) => {
     setSlippedEnabled(enabled);
     setSlippedWindow(window);
+    if (compUrls !== undefined) setCompetitorUrls(compUrls);
     const formData = new FormData();
     formData.append('action', 'amazer_via_save_slipped_settings');
     formData.append('nonce', wpSettings.nonce);
     formData.append('slipped_enabled', enabled ? 'yes' : 'no');
     formData.append('slipped_window', window);
+    if (compUrls !== undefined) formData.append('competitor_urls', compUrls);
     await fetch(wpSettings.ajaxUrl, { method: 'POST', body: formData });
   };
 
@@ -734,7 +738,16 @@ export default function MerchantDashboard() {
         )}
 
         {activeTab === 'demographic' && <DemographicTab />}
-        {activeTab === 'slipped' && <SlippedTab />}
+        {activeTab === 'slipped' && (
+          <SlippedTab
+            companies={companies}
+            generalVisitors={combinedGeneralVisitors}
+            allHits={allHits}
+            slippedEnabled={slippedEnabled}
+            slippedWindow={slippedWindow}
+            onNavigateTab={(tab) => handleTabSwitch(tab)}
+          />
+        )}
         {activeTab === 'settings' && (
           <SettingsTab
             wpSettings={wpSettings}
@@ -743,6 +756,7 @@ export default function MerchantDashboard() {
             opportunityDuration={opportunityDuration}
             slippedEnabled={slippedEnabled}
             slippedWindow={slippedWindow}
+            competitorUrls={competitorUrls}
             trackingEnabled={trackingEnabled}
             onSaveAnalyticsUrls={handleSaveAnalyticsUrls}
             onSaveOpportunitySettings={handleSaveOpportunitySettings}

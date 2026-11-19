@@ -348,13 +348,14 @@ function amazer_via_register_admin_dashboard_menu() {
         30
     );
 
-    // Primary Submenus: Dashboard, Traffic, Firmography, High Intent, Conversion, Settings
+    // Primary Submenus: Dashboard, Traffic, Firmography, High Intent, Conversion, Slipped, Settings
     $submenus = array(
         'dashboard'    => __( 'Dashboard', 'amazer-visitor-intelligence' ),
         'traffic'      => __( 'Traffic', 'amazer-visitor-intelligence' ),
         'firmographic' => __( 'Firmography', 'amazer-visitor-intelligence' ),
         'high_intent'  => __( 'High Intent', 'amazer-visitor-intelligence' ),
         'conversion'   => __( 'Conversion', 'amazer-visitor-intelligence' ),
+        'slipped'      => __( 'Slipped', 'amazer-visitor-intelligence' ),
         'settings'     => __( 'Settings', 'amazer-visitor-intelligence' ),
     );
 
@@ -436,6 +437,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'conversionUrls'      => get_option( 'amazer_via_conversion_urls', '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout' ),
             'slippedEnabled'      => get_option( 'amazer_via_slipped_enabled', 'yes' ),
             'slippedWindow'       => get_option( 'amazer_via_slipped_window', '48h' ),
+            'competitorUrls'      => get_option( 'amazer_via_competitor_urls', '' ),
         ) );
     }
 }
@@ -565,16 +567,19 @@ function amazer_via_ajax_save_slipped_settings() {
         wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
     }
 
-    $enabled = isset( $_POST['slipped_enabled'] ) && 'yes' === sanitize_text_field( wp_unslash( $_POST['slipped_enabled'] ) ) ? 'yes' : 'no';
-    $window  = isset( $_POST['slipped_window'] ) ? sanitize_text_field( wp_unslash( $_POST['slipped_window'] ) ) : '48h';
+    $enabled        = isset( $_POST['slipped_enabled'] ) && 'yes' === sanitize_text_field( wp_unslash( $_POST['slipped_enabled'] ) ) ? 'yes' : 'no';
+    $window         = isset( $_POST['slipped_window'] ) ? sanitize_text_field( wp_unslash( $_POST['slipped_window'] ) ) : '48h';
+    $competitor_urls = isset( $_POST['competitor_urls'] ) ? sanitize_textarea_field( wp_unslash( $_POST['competitor_urls'] ) ) : '';
 
     update_option( 'amazer_via_slipped_enabled', $enabled );
     update_option( 'amazer_via_slipped_window', $window );
+    update_option( 'amazer_via_competitor_urls', $competitor_urls );
 
     wp_send_json_success( array(
         'message'         => __( 'Slipped tracking preferences updated successfully.', 'amazer-visitor-intelligence' ),
         'slipped_enabled' => $enabled,
         'slipped_window'  => $window,
+        'competitor_urls' => $competitor_urls,
     ) );
 }
 add_action( 'wp_ajax_amazer_via_save_slipped_settings', 'amazer_via_ajax_save_slipped_settings' );
