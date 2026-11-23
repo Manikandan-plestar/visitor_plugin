@@ -26,6 +26,7 @@ import {
   Layers,
   ShieldCheck,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 
 /**
@@ -253,6 +254,8 @@ export default function TrafficTab({
   const [pageSize, setPageSize] = useState(10);
   const [copiedIp, setCopiedIp] = useState(null);
   const [selectedIp, setSelectedIp] = useState(null); // When set, renders Individual IP Details View
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   // Group and flatten visitor hits by IP Address
   const aggregatedTraffic = useMemo(() => {
@@ -401,13 +404,24 @@ export default function TrafficTab({
     return aggregatedTraffic.find((t) => t.ip === selectedIp) || null;
   }, [selectedIp, aggregatedTraffic]);
 
-  // Filter & Search
+  // Filter & Search with Date Filter (From - To)
   const filteredTraffic = useMemo(() => {
     return aggregatedTraffic.filter((item) => {
       if (filterType === 'NEW' && item.isReturning) return false;
       if (filterType === 'RETURNING' && !item.isReturning) return false;
       if (filterType === 'CORPORATE' && !item.isCorporate) return false;
       if (filterType === 'CONSUMER' && item.isCorporate) return false;
+
+      if (fromDate) {
+        const fromTs = new Date(fromDate + 'T00:00:00').getTime();
+        const rLatest = item.latestTimestamp || (item.latestDate ? new Date(item.latestDate).getTime() : 0);
+        if (!isNaN(fromTs) && rLatest && rLatest < fromTs) return false;
+      }
+      if (toDate) {
+        const toTs = new Date(toDate + 'T23:59:59.999').getTime();
+        const rFirst = item.firstTimestamp || (item.latestDate ? new Date(item.latestDate).getTime() : 0);
+        if (!isNaN(toTs) && rFirst && rFirst > toTs) return false;
+      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -419,7 +433,7 @@ export default function TrafficTab({
       }
       return true;
     });
-  }, [aggregatedTraffic, filterType, searchQuery]);
+  }, [aggregatedTraffic, filterType, searchQuery, fromDate, toDate]);
 
   // Sort
   const sortedTraffic = useMemo(() => {
@@ -699,10 +713,10 @@ export default function TrafficTab({
             </p>
           </div>
 
-          {/* Search Bar, Filter Dropdown, and Sort By - In Same Row */}
-          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap justify-start lg:justify-end flex-1 max-w-full lg:max-w-3xl">
+          {/* Search Bar, Date Filter, Filter Dropdown, and Sort By */}
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap justify-start lg:justify-end flex-1 max-w-full">
             {/* Search Bar with compact width */}
-            <div className="relative w-full sm:w-52 md:w-64 shrink-0">
+            <div className="relative w-full sm:w-48 md:w-56 shrink-0">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -711,6 +725,37 @@ export default function TrafficTab({
                 placeholder="Search IP, location, source..."
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
               />
+            </div>
+
+            {/* Date Filter: From - To */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs shrink-0">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-slate-500 font-medium">From:</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+                aria-label="Filter from date"
+              />
+              <span className="text-slate-400 font-medium ml-1">To:</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+                aria-label="Filter to date"
+              />
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => { setFromDate(''); setToDate(''); setCurrentPage(1); }}
+                  className="ml-1 p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Clear Date Filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Filter Dropdown in Single Button */}

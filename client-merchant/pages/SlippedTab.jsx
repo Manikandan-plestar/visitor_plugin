@@ -36,6 +36,8 @@ export default function SlippedTab({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   // Build raw slipped records from storefront visitors
   const rawSlippedRecords = useMemo(() => {
@@ -171,7 +173,15 @@ export default function SlippedTab({
       }
 
       // 2. Date Filter
-      if (dateFilter !== 'all') {
+      if (fromDate) {
+        const fromTs = new Date(fromDate + 'T00:00:00').getTime();
+        if (!isNaN(fromTs) && rec.slippedTimestamp < fromTs) return false;
+      }
+      if (toDate) {
+        const toTs = new Date(toDate + 'T23:59:59.999').getTime();
+        if (!isNaN(toTs) && rec.slippedTimestamp > toTs) return false;
+      }
+      if (dateFilter !== 'all' && !fromDate && !toDate) {
         const ts = rec.slippedTimestamp;
         const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
         if (dateFilter === 'today') {
@@ -190,7 +200,7 @@ export default function SlippedTab({
 
       return true;
     });
-  }, [rawSlippedRecords, searchQuery, dateFilter]);
+  }, [rawSlippedRecords, searchQuery, dateFilter, fromDate, toDate]);
 
   // Aggregate Top Metrics
   const totalSlippedCount = filteredRecords.length;
@@ -349,28 +359,61 @@ export default function SlippedTab({
           )}
         </div>
 
-        {/* Date Filter Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start lg:self-auto">
-          {[
-            { id: 'all', label: 'All Time' },
-            { id: 'today', label: 'Today' },
-            { id: 'yesterday', label: 'Yesterday' },
-            { id: '7d', label: '7D' },
-            { id: '14d', label: '14D' },
-            { id: '30d', label: '30D' },
-          ].map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setDateFilter(d.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                dateFilter === d.id
-                  ? 'bg-white text-blue-600 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
+          {/* Date Filter: From - To */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs">
+            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="text-slate-500 font-medium">From:</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+              aria-label="Filter from date"
+            />
+            <span className="text-slate-400 font-medium ml-1">To:</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+              aria-label="Filter to date"
+            />
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={() => { setFromDate(''); setToDate(''); }}
+                className="ml-1 p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                title="Clear Date Filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Filter Tabs */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600">
+            {[
+              { id: 'all', label: 'All Time' },
+              { id: 'today', label: 'Today' },
+              { id: 'yesterday', label: 'Yesterday' },
+              { id: '7d', label: '7D' },
+              { id: '14d', label: '14D' },
+              { id: '30d', label: '30D' },
+            ].map((d) => (
+              <button
+                key={d.id}
+                onClick={() => { setDateFilter(d.id); setFromDate(''); setToDate(''); }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  dateFilter === d.id && !fromDate && !toDate
+                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -19,6 +19,8 @@ import {
   ArrowUpRight,
   Calendar,
   Filter,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation } from './TrafficTab';
 
@@ -119,6 +121,7 @@ export default function DashboardTab({
   onNavigateTab,
 }) {
   const [timeRange, setTimeRange] = useState('14d');
+  const [chartOffset, setChartOffset] = useState(0); // 0 = current 14 days, 1 = previous 14 days, etc.
   const [dateFilter, setDateFilter] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -258,20 +261,21 @@ export default function DashboardTab({
 
   const totalIdentifiedCompanies = filteredCompanies.length;
 
-  // Traffic Logs: 14-day daily hit volume trend
+  // Traffic Logs: 14-day daily hit volume trend (supports navigating previous 14 days)
   const trafficDays = useMemo(() => {
     const days = 14;
     const result = [];
     const now = Date.now();
+    const baseEnd = now - chartOffset * 14 * 86400000;
     for (let i = days - 1; i >= 0; i--) {
-      const dayDate = new Date(now - i * 86400000);
+      const dayDate = new Date(baseEnd - i * 86400000);
       const label = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const dayStr = dayDate.toISOString().slice(0, 10);
       const dayHits = allHits.filter((h) => (h.visited_at || '').startsWith(dayStr)).length;
       result.push({ label, count: dayHits, date: dayStr });
     }
     return result;
-  }, [allHits]);
+  }, [allHits, chartOffset]);
 
   const maxDailyCount = Math.max(...trafficDays.map((d) => d.count), 5);
 
@@ -367,12 +371,36 @@ export default function DashboardTab({
               <span>Traffic Logs</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Daily visitor telemetry and request volume over the past 14 days
+              Daily visitor telemetry and request volume {chartOffset === 0 ? 'over the past 14 days' : `${chartOffset * 14}–${(chartOffset + 1) * 14} days ago`}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600 self-start sm:self-auto">
-            <span className="px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs font-bold">14 Days</span>
-            <span className="px-2.5 py-1 text-slate-500">Live Telemetry</span>
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-700 self-start sm:self-auto shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setChartOffset((p) => p + 1)}
+              className="px-2 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
+              title="Previous 14 Days"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px] font-medium">Prev 14D</span>
+            </button>
+            <span className="px-2 py-1 text-slate-800 font-mono text-[11px] font-bold whitespace-nowrap">
+              {trafficDays[0]?.label} – {trafficDays[trafficDays.length - 1]?.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => setChartOffset((p) => Math.max(0, p - 1))}
+              disabled={chartOffset === 0}
+              className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                chartOffset === 0
+                  ? 'opacity-40 cursor-not-allowed bg-slate-200/50 text-slate-400'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow-2xs cursor-pointer'
+              }`}
+              title="Next 14 Days"
+            >
+              <span className="hidden sm:inline text-[11px] font-medium">Next 14D</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 

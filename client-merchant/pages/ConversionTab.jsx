@@ -22,6 +22,7 @@ import {
   Building2,
   User,
   Info,
+  X,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation, maskIpAddress } from './TrafficTab';
 
@@ -42,6 +43,9 @@ export default function ConversionTab({
   const [sortOrder, setSortOrder] = useState('desc');
   const [activeUrlFilter, setActiveUrlFilter] = useState('ALL');
   const [selectedVisitorDetail, setSelectedVisitorDetail] = useState(null);
+  const [chartOffset, setChartOffset] = useState(0); // 0 = current 14 days, 1 = prev 14 days
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   // Normalize configured conversion URLs array
   const targetConversionUrls = useMemo(() => {
@@ -209,20 +213,21 @@ export default function ConversionTab({
 
   const conversionRate = Math.min(100, Math.round((uniqueConvertingVisitors / totalStoreVisitors) * 100));
 
-  // 14-day conversion activity trendline
+  // 14-day conversion activity trendline (supports navigating previous 14 days)
   const trendDays = useMemo(() => {
     const days = 14;
     const result = [];
     const now = Date.now();
+    const baseEnd = now - chartOffset * 14 * 86400000;
     for (let i = days - 1; i >= 0; i--) {
-      const dayDate = new Date(now - i * 86400000);
+      const dayDate = new Date(baseEnd - i * 86400000);
       const label = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const dayStr = dayDate.toISOString().slice(0, 10);
       const count = conversionEvents.filter((e) => (e.conversionDate || '').startsWith(dayStr)).length;
       result.push({ label, count, date: dayStr });
     }
     return result;
-  }, [conversionEvents]);
+  }, [conversionEvents, chartOffset]);
 
   const maxTrend = Math.max(...trendDays.map((d) => d.count), 4);
 
@@ -270,7 +275,7 @@ export default function ConversionTab({
     return Array.from(counts.entries()).map(([url, count]) => ({ url, count }));
   }, [conversionVisitors]);
 
-  // Filter & Search
+  // Filter & Search with Date Filter (From - To)
   const filteredVisitors = useMemo(() => {
     return conversionVisitors.filter((v) => {
       if (activeUrlFilter !== 'ALL') {
@@ -278,6 +283,16 @@ export default function ConversionTab({
           (e.pageUrl || '').toLowerCase().includes(activeUrlFilter.toLowerCase())
         );
         if (!hasUrl) return false;
+      }
+      if (fromDate) {
+        const fromTs = new Date(fromDate + 'T00:00:00').getTime();
+        const rLatest = v.latestConversionTimestamp || (v.latestConversionDate ? new Date(v.latestConversionDate).getTime() : 0);
+        if (!isNaN(fromTs) && rLatest && rLatest < fromTs) return false;
+      }
+      if (toDate) {
+        const toTs = new Date(toDate + 'T23:59:59.999').getTime();
+        const rEarliest = v.firstVisitTimestamp || (v.latestConversionDate ? new Date(v.latestConversionDate).getTime() : 0);
+        if (!isNaN(toTs) && rEarliest && rEarliest > toTs) return false;
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -291,7 +306,7 @@ export default function ConversionTab({
       }
       return true;
     });
-  }, [conversionVisitors, activeUrlFilter, searchQuery]);
+  }, [conversionVisitors, activeUrlFilter, searchQuery, fromDate, toDate]);
 
   // Sort
   const sortedVisitors = useMemo(() => {
@@ -387,12 +402,39 @@ export default function ConversionTab({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
         {/* Trend Bar Chart (2 Cols) */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-rose-500" />
               <span>Conversion Events Over Time</span>
             </h4>
-            <span className="text-[11px] text-slate-400 font-mono">14 Days</span>
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-700 self-start sm:self-auto shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setChartOffset((p) => p + 1)}
+                className="px-2 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
+                title="Previous 14 Days"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[11px] font-medium">Prev 14D</span>
+              </button>
+              <span className="px-2 py-1 text-slate-800 font-mono text-[11px] font-bold whitespace-nowrap">
+                {trendDays[0]?.label} – {trendDays[trendDays.length - 1]?.label}
+              </span>
+              <button
+                type="button"
+                onClick={() => setChartOffset((p) => Math.max(0, p - 1))}
+                disabled={chartOffset === 0}
+                className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  chartOffset === 0
+                    ? 'opacity-40 cursor-not-allowed bg-slate-200/50 text-slate-400'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow-2xs cursor-pointer'
+                }`}
+                title="Next 14 Days"
+              >
+                <span className="hidden sm:inline text-[11px] font-medium">Next 14D</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 h-44 flex items-end justify-between gap-1 sm:gap-2">
@@ -478,7 +520,38 @@ export default function ConversionTab({
             />
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap justify-start lg:justify-end text-xs">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap justify-start lg:justify-end text-xs">
+            {/* Date Filter: From - To */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs shrink-0">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-slate-500 font-medium">From:</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+                aria-label="Filter from date"
+              />
+              <span className="text-slate-400 font-medium ml-1">To:</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+                aria-label="Filter to date"
+              />
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => { setFromDate(''); setToDate(''); setCurrentPage(1); }}
+                  className="ml-1 p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Clear Date Filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
             {/* Conversion URL Filter Dropdown */}
             <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
               <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />

@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   Layers,
   Monitor,
+  Calendar,
+  X,
 } from 'lucide-react';
 
 /**
@@ -46,6 +48,8 @@ export default function FirmographicTab({
   onDeleteDemoCompany,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [viewingCompanyId, setViewingCompanyId] = useState(null);
 
   // Selected company object for detail inspection
@@ -53,8 +57,24 @@ export default function FirmographicTab({
     ? companies.find((c) => String(c.id) === String(viewingCompanyId)) || null
     : null;
 
-  // Filter companies by search query
+  // Filter companies by search query and date range
   const filteredCompanies = companies.filter((c) => {
+    if (fromDate) {
+      const fromTs = new Date(fromDate + 'T00:00:00').getTime();
+      const hasRecentHit = (c.page_visits || []).some((h) => {
+        const ts = new Date(h.visited_at).getTime();
+        return !isNaN(ts) && ts >= fromTs;
+      });
+      if (!hasRecentHit && c.page_visits && c.page_visits.length > 0) return false;
+    }
+    if (toDate) {
+      const toTs = new Date(toDate + 'T23:59:59.999').getTime();
+      const hasEarliestHit = (c.page_visits || []).some((h) => {
+        const ts = new Date(h.visited_at).getTime();
+        return !isNaN(ts) && ts <= toTs;
+      });
+      if (!hasEarliestHit && c.page_visits && c.page_visits.length > 0) return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -361,16 +381,48 @@ export default function FirmographicTab({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <div className="relative w-full sm:w-64">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Search */}
+            <div className="relative w-full sm:w-60">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search identified companies..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
               />
+            </div>
+
+            {/* Date Filter: From - To */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-slate-500 font-medium">From:</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+                aria-label="Filter from date"
+              />
+              <span className="text-slate-400 font-medium ml-1">To:</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
+                aria-label="Filter to date"
+              />
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => { setFromDate(''); setToDate(''); }}
+                  className="ml-1 p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Clear Date Filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
