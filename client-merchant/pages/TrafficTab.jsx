@@ -699,109 +699,103 @@ export default function TrafficTab({
   // ==========================================================================
   return (
     <div className="space-y-4">
-      {/* Header & Controls Bar - Unified Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
-        {/* Title Header Row */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+      {/* Header & Controls Bar - Guaranteed Single Unified Row */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs overflow-x-auto">
+        <div className="flex items-center justify-between gap-3 min-w-max w-full">
+          {/* Title on Left */}
+          <div className="flex items-center gap-2 shrink-0">
             <Globe className="w-5 h-5 text-blue-600 shrink-0" />
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">Visitor traffic log</h2>
-              <p className="text-xs text-slate-500 hidden md:block mt-0.5">
-                Live tracking log of visitor IPs, location, hits, and page views. Click any row to inspect IP details.
-              </p>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 whitespace-nowrap">
+              Visitor traffic log
+            </h2>
+          </div>
+
+          {/* All Controls in the Same Row (Compact Widths) */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Search Bar with compact width */}
+            <div className="relative w-36 sm:w-44 shrink-0">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                placeholder="Search IP, source..."
+                className="w-full pl-7 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
+              />
             </div>
-          </div>
-          <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-            {filteredTraffic.length} Visitors
-          </span>
-        </div>
 
-        {/* All Filters In the Same Row */}
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap overflow-x-auto pb-1 sm:pb-0 pt-1 border-t border-slate-100">
-          {/* Search Bar */}
-          <div className="relative flex-1 min-w-[180px] max-w-sm shrink-0">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              placeholder="Search IP, location, source..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-2xs"
-            />
-          </div>
+            {/* Date Filter: From - To */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-700 shadow-2xs shrink-0">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-slate-500 font-medium text-[11px]">From:</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer w-[105px]"
+                aria-label="Filter from date"
+              />
+              <span className="text-slate-400 font-medium text-[11px] ml-0.5">To:</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer w-[105px]"
+                aria-label="Filter to date"
+              />
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => { setFromDate(''); setToDate(''); setCurrentPage(1); }}
+                  className="ml-0.5 p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Clear Date Filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-          {/* Date Filter: From - To */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs shrink-0">
-            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="text-slate-500 font-medium">From:</span>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
-              className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
-              aria-label="Filter from date"
-            />
-            <span className="text-slate-400 font-medium ml-1">To:</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
-              className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer"
-              aria-label="Filter to date"
-            />
-            {(fromDate || toDate) && (
+            {/* Filter Dropdown in Single Button */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
+              <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <select
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
+                aria-label="Filter visitor types"
+              >
+                <option value="ALL">All ({aggregatedTraffic.length})</option>
+                <option value="NEW">New ({aggregatedTraffic.filter((t) => !t.isReturning).length})</option>
+                <option value="RETURNING">Returning ({aggregatedTraffic.filter((t) => t.isReturning).length})</option>
+                <option value="CORPORATE">Corporate ({aggregatedTraffic.filter((t) => t.isCorporate).length})</option>
+                <option value="CONSUMER">General / ISP ({aggregatedTraffic.filter((t) => !t.isCorporate).length})</option>
+              </select>
+            </div>
+
+            {/* Sort by Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
+              <span className="text-slate-500 text-xs font-medium">Sort:</span>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
+                aria-label="Sort visitor log"
+              >
+                <option value="hits">Highest Total Hits</option>
+                <option value="unique_pages">Most Pages Visited</option>
+                <option value="duration">Longest Dwell Duration</option>
+                <option value="date">Date</option>
+                <option value="ip">IP Address</option>
+              </select>
               <button
                 type="button"
-                onClick={() => { setFromDate(''); setToDate(''); setCurrentPage(1); }}
-                className="ml-1 p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                title="Clear Date Filter"
+                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                className="p-1 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-slate-600"
+                title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
               >
-                <X className="w-3.5 h-3.5" />
+                <ArrowUpDown className="w-3.5 h-3.5" />
               </button>
-            )}
-          </div>
-
-          {/* Filter Dropdown */}
-          <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
-            <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <select
-              value={filterType}
-              onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
-              className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
-              aria-label="Filter visitor types"
-            >
-              <option value="ALL">All ({aggregatedTraffic.length})</option>
-              <option value="NEW">New ({aggregatedTraffic.filter((t) => !t.isReturning).length})</option>
-              <option value="RETURNING">Returning ({aggregatedTraffic.filter((t) => t.isReturning).length})</option>
-              <option value="CORPORATE">Corporate ({aggregatedTraffic.filter((t) => t.isCorporate).length})</option>
-              <option value="CONSUMER">General / ISP ({aggregatedTraffic.filter((t) => !t.isCorporate).length})</option>
-            </select>
-          </div>
-
-          {/* Sort by Dropdown */}
-          <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs transition-colors shrink-0">
-            <span className="text-slate-500 text-xs font-medium">Sort:</span>
-            <select
-              value={sortField}
-              onChange={(e) => setSortField(e.target.value)}
-              className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer pr-1"
-              aria-label="Sort visitor log"
-            >
-              <option value="hits">Highest Total Hits</option>
-              <option value="unique_pages">Most Pages Visited</option>
-              <option value="duration">Longest Dwell Duration</option>
-              <option value="date">Date</option>
-              <option value="ip">IP Address</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-              className="p-1 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-slate-600"
-              title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-            >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-            </button>
+            </div>
           </div>
         </div>
       </div>
