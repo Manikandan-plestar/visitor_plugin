@@ -215,7 +215,7 @@ function formatDateWithoutTime(val) {
         day: 'numeric',
       });
     }
-  } catch (e) {}
+  } catch (e) { }
   return 'Recent';
 }
 
@@ -235,7 +235,7 @@ function formatFullDateTime(val) {
         minute: '2-digit',
       });
     }
-  } catch (e) {}
+  } catch (e) { }
   return String(val);
 }
 
@@ -470,7 +470,7 @@ export default function TrafficTab({
       navigator.clipboard.writeText(text);
       setCopiedIp(text);
       setTimeout(() => setCopiedIp(null), 2000);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const formatSeconds = (sec) => {
