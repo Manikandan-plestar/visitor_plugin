@@ -418,31 +418,126 @@ app.post('/api/v1/store/activate', async (req, res) => {
 
     if (getIsConnected()) {
       const pool = getPool();
+
+      // OPTION 1: Check if this IP is already associated with an enriched/verified company
+      let inheritedCompany = null;
+      try {
+        const [existingCompanies] = await pool.query(
+          `SELECT company_name, physical_address, telephone, official_email, website, industry, status
+           FROM svt_stores
+           WHERE activation_ip = ? AND company_name IS NOT NULL AND TRIM(company_name) != ''
+           ORDER BY (status = 'Verified') DESC, (status = 'Watching') DESC, updated_at DESC
+           LIMIT 1`,
+          [activationIp]
+        );
+        if (existingCompanies.length > 0) {
+          inheritedCompany = existingCompanies[0];
+        } else {
+          // Attempt automatic WHOIS / reverse DNS lookup
+          const enriched = await autoEnrichIp(activationIp);
+          if (enriched && enriched.found && enriched.company_name) {
+            inheritedCompany = {
+              company_name: enriched.company_name,
+              physical_address: enriched.physical_address || '',
+              telephone: enriched.telephone || '',
+              official_email: enriched.official_email || '',
+              website: enriched.website || cleanUrl,
+              industry: enriched.industry || 'B2B Enterprise',
+              status: 'Verified',
+            };
+          }
+        }
+      } catch (checkErr) {
+        console.warn('Could not check existing company for IP:', checkErr.message);
+      }
+
+      const compName = inheritedCompany ? inheritedCompany.company_name : null;
+      const physAddr = inheritedCompany ? (inheritedCompany.physical_address || '') : null;
+      const phone = inheritedCompany ? (inheritedCompany.telephone || '') : null;
+      const email = inheritedCompany ? (inheritedCompany.official_email || '') : null;
+      const web = inheritedCompany ? (inheritedCompany.website || cleanUrl) : null;
+      const ind = inheritedCompany ? (inheritedCompany.industry || 'B2B Enterprise') : 'B2B Enterprise';
+      const stat = inheritedCompany ? (inheritedCompany.status || 'Verified') : 'Pending';
+
       await pool.query(
-        `INSERT INTO svt_stores (site_url, site_name, activation_ip, status)
-         VALUES (?, ?, ?, 'Pending')
-         ON DUPLICATE KEY UPDATE site_name = VALUES(site_name), activation_ip = VALUES(activation_ip), updated_at = NOW()`,
-        [cleanUrl, site_name || cleanUrl, activationIp]
+        `INSERT INTO svt_stores (site_url, site_name, activation_ip, status, company_name, physical_address, telephone, official_email, website, industry)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE 
+           site_name = VALUES(site_name), 
+           activation_ip = VALUES(activation_ip),
+           company_name = COALESCE(company_name, VALUES(company_name)),
+           physical_address = COALESCE(physical_address, VALUES(physical_address)),
+           telephone = COALESCE(telephone, VALUES(telephone)),
+           official_email = COALESCE(official_email, VALUES(official_email)),
+           website = COALESCE(website, VALUES(website)),
+           industry = COALESCE(industry, VALUES(industry)),
+           status = CASE WHEN status = 'Verified' THEN 'Verified' WHEN VALUES(status) = 'Verified' THEN 'Verified' ELSE status END,
+           updated_at = NOW()`,
+        [cleanUrl, site_name || cleanUrl, activationIp, stat, compName, physAddr, phone, email, web, ind]
       );
       const [rows] = await pool.query('SELECT * FROM svt_stores WHERE site_url = ?', [cleanUrl]);
       return res.json({ success: true, store: rows[0], activation_ip: activationIp });
     }
 
+    // In-memory fallback
     let existing = memoryDb.stores.find((s) => s.site_url === cleanUrl);
+
+    // Check if this IP is already verified in memory
+    let inheritedMem = memoryDb.stores.find(
+      (s) => s.activation_ip === activationIp && s.company_name && (s.status === 'Verified' || s.status === 'Watching')
+    );
+
+    if (!inheritedMem) {
+      const enriched = await autoEnrichIp(activationIp);
+      if (enriched && enriched.found && enriched.company_name) {
+        inheritedMem = {
+          company_name: enriched.company_name,
+          physical_address: enriched.physical_address || '',
+          telephone: enriched.telephone || '',
+          official_email: enriched.official_email || '',
+          website: enriched.website || cleanUrl,
+          industry: enriched.industry || 'B2B Enterprise',
+          status: 'Verified',
+        };
+      }
+    }
+
+    const memCompName = inheritedMem ? inheritedMem.company_name : null;
+    const memPhysAddr = inheritedMem ? inheritedMem.physical_address : '';
+    const memPhone = inheritedMem ? inheritedMem.telephone : '';
+    const memEmail = inheritedMem ? inheritedMem.official_email : '';
+    const memWeb = inheritedMem ? inheritedMem.website : '';
+    const memInd = inheritedMem ? inheritedMem.industry : 'B2B Enterprise';
+    const memStat = inheritedMem ? (inheritedMem.status || 'Verified') : 'Pending';
+
     if (!existing) {
       existing = {
         id: memoryDb.stores.length + 1,
         site_url: cleanUrl,
         site_name: site_name || cleanUrl,
         activation_ip: activationIp,
-        status: 'Pending',
-        company_name: null,
+        status: memStat,
+        company_name: memCompName,
+        physical_address: memPhysAddr,
+        telephone: memPhone,
+        official_email: memEmail,
+        website: memWeb,
+        industry: memInd,
         created_at: nowIso,
       };
       memoryDb.stores.unshift(existing);
     } else {
       existing.activation_ip = activationIp;
       existing.site_name = site_name || existing.site_name;
+      if (!existing.company_name && memCompName) {
+        existing.company_name = memCompName;
+        existing.physical_address = memPhysAddr;
+        existing.telephone = memPhone;
+        existing.official_email = memEmail;
+        existing.website = memWeb;
+        existing.industry = memInd;
+        existing.status = memStat;
+      }
     }
 
     res.json({
@@ -800,6 +895,31 @@ app.get('/api/v1/internal/admin/stats', requireStaffAuth, async (req, res) => {
   try {
     if (getIsConnected()) {
       const pool = getPool();
+
+      // OPTION 1: Auto-inherit verified company details for any pending store sharing a verified IP
+      try {
+        await pool.query(`
+          UPDATE svt_stores target
+          JOIN (
+            SELECT activation_ip, company_name, physical_address, telephone, official_email, website, industry
+            FROM svt_stores
+            WHERE company_name IS NOT NULL AND TRIM(company_name) != '' AND status = 'Verified'
+            GROUP BY activation_ip
+          ) source ON target.activation_ip = source.activation_ip
+          SET target.company_name = source.company_name,
+              target.physical_address = COALESCE(source.physical_address, target.physical_address),
+              target.telephone = COALESCE(source.telephone, target.telephone),
+              target.official_email = COALESCE(source.official_email, target.official_email),
+              target.website = COALESCE(source.website, target.website),
+              target.industry = COALESCE(source.industry, target.industry),
+              target.status = 'Verified',
+              target.updated_at = NOW()
+          WHERE target.status = 'Pending' OR target.company_name IS NULL OR TRIM(target.company_name) = '';
+        `);
+      } catch (reconcileErr) {
+        console.warn('Auto-reconciliation note:', reconcileErr.message);
+      }
+
       const statsQuery = `
         SELECT 
           COUNT(*) as total_stores,
@@ -817,6 +937,27 @@ app.get('/api/v1/internal/admin/stats', requireStaffAuth, async (req, res) => {
         stores,
       });
     }
+
+    // Auto-inherit verified company details for memoryDb
+    const verifiedMap = new Map();
+    memoryDb.stores.forEach((s) => {
+      if (s.status === 'Verified' && s.company_name && s.activation_ip) {
+        verifiedMap.set(s.activation_ip, s);
+      }
+    });
+    memoryDb.stores.forEach((s) => {
+      if ((s.status === 'Pending' || !s.company_name) && verifiedMap.has(s.activation_ip)) {
+        const v = verifiedMap.get(s.activation_ip);
+        s.company_name = v.company_name;
+        s.physical_address = v.physical_address || s.physical_address;
+        s.telephone = v.telephone || s.telephone;
+        s.official_email = v.official_email || s.official_email;
+        s.website = v.website || s.website;
+        s.industry = v.industry || s.industry;
+        s.status = 'Verified';
+        s.updated_at = new Date().toISOString();
+      }
+    });
 
     const today = new Date().toDateString();
     const todayActivated = memoryDb.stores.filter(
@@ -889,6 +1030,29 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
         store_id,
       ]);
       const [updated] = await pool.query('SELECT * FROM svt_stores WHERE id = ?', [store_id]);
+
+      // OPTION 1: Propagate verified company identity to any other stores on the same IP
+      const targetIp = activation_ip || updated[0]?.activation_ip;
+      if (targetIp && company_name) {
+        try {
+          await pool.query(
+            `UPDATE svt_stores
+             SET company_name = ?,
+                 physical_address = COALESCE(?, physical_address),
+                 telephone = COALESCE(?, telephone),
+                 official_email = COALESCE(?, official_email),
+                 website = COALESCE(?, website),
+                 industry = COALESCE(?, industry),
+                 status = ?,
+                 updated_at = NOW()
+             WHERE activation_ip = ? AND (company_name IS NULL OR status = 'Pending');`,
+            [company_name, physical_address, telephone, official_email, website, industry, formattedStatus, targetIp]
+          );
+        } catch (propErr) {
+          console.warn('Could not propagate company to stores with same IP:', propErr.message);
+        }
+      }
+
       return res.json({ success: true, store: updated[0] });
     }
 
@@ -906,6 +1070,23 @@ app.post('/api/v1/internal/admin/enrich-store', requireStaffAuth, async (req, re
     if (activation_ip !== undefined) store.activation_ip = activation_ip;
     store.status = formattedStatus;
     store.updated_at = new Date().toISOString();
+
+    // Propagate in memoryDb as well
+    const memTargetIp = activation_ip || store.activation_ip;
+    if (memTargetIp && company_name) {
+      memoryDb.stores.forEach((s) => {
+        if (s.activation_ip === memTargetIp && (s.status === 'Pending' || !s.company_name)) {
+          s.company_name = company_name;
+          s.physical_address = physical_address || s.physical_address;
+          s.telephone = telephone || s.telephone;
+          s.official_email = official_email || s.official_email;
+          s.website = website || s.website;
+          s.industry = industry || s.industry;
+          s.status = formattedStatus;
+          s.updated_at = new Date().toISOString();
+        }
+      });
+    }
 
     res.json({ success: true, store });
   } catch (err) {
