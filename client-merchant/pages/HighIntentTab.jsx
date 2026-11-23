@@ -280,6 +280,28 @@ export default function HighIntentTab({
     return `${m}m ${s < 10 ? '0' : ''}${s}s`;
   };
 
+  const formatHitDate = (dateVal) => {
+    if (!dateVal) return '--';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return String(dateVal);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return String(dateVal);
+    }
+  };
+
+  const formatHitTime = (dateVal) => {
+    if (!dateVal) return '';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
+  };
+
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
       {/* Top Analytics Summary Cards */}
@@ -473,6 +495,7 @@ export default function HighIntentTab({
                 <th className="py-3.5 px-4 w-12 text-center bg-slate-50">S.No</th>
                 <th className="py-3.5 px-4 text-left bg-slate-50">IP Address</th>
                 <th className="py-3.5 px-4 text-left bg-slate-50">Country</th>
+                <th className="py-3.5 px-4 text-left bg-slate-50">Date & Time</th>
                 <th className="py-3.5 px-4 text-center bg-slate-50">Visits</th>
                 <th className="py-3.5 px-4 text-center bg-slate-50">Page Views</th>
                 <th className="py-3.5 px-4 text-left bg-slate-50">Page URL</th>
@@ -484,7 +507,7 @@ export default function HighIntentTab({
             <tbody className="divide-y divide-slate-100">
               {paginatedVisitors.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400">
+                  <td colSpan="10" className="py-12 text-center text-slate-400">
                     No High-Intent visitor events match your criteria.
                   </td>
                 </tr>
@@ -513,6 +536,17 @@ export default function HighIntentTab({
                           <span className="text-base leading-none">{row.locationInfo.flag}</span>
                           <span className="font-medium text-slate-800">{row.locationInfo.country || 'Global'}</span>
                         </div>
+                      </td>
+
+                      {/* Date & Time */}
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-800 font-medium">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{formatHitDate(row.latestVisit)}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono block pl-5">
+                          {formatHitTime(row.latestVisit)}
+                        </span>
                       </td>
 
                       {/* Visits */}
