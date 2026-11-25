@@ -779,6 +779,126 @@ app.post('/api/v1/track/batch', async (req, res) => {
 // ============================================================================
 // 3. Merchant Dashboard API (Scoped Strictly to Current Store)
 // ============================================================================
+app.get('/api/v1/analytics/footprint', async (req, res) => {
+  try {
+    const rawTarget = req.query.storeUrl || '';
+    const cleanTarget = normalizeUrl(rawTarget);
+    const competitorListStr = req.query.competitors || '';
+    
+    // Parse list of competitor domains configured by merchant
+    const competitorDomains = competitorListStr
+      .split(',')
+      .map(c => c.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+      .filter(Boolean);
+
+    let footprintMatches = [];
+
+    if (getIsConnected()) {
+      const pool = getPool();
+      
+      // Step 1: Get all unique IPs that visited this target store
+      const [merchantIps] = await pool.query(
+        `SELECT DISTINCT visitor_ip FROM svt_visitor_hits WHERE target_store = ?`,
+        [cleanTarget]
+      );
+
+      const targetIps = merchantIps.map(r => r.visitor_ip).filter(Boolean);
+
+      if (targetIps.length > 0) {
+        // Step 2: Find hits from these SAME IPs on other stores/domains (competitors)
+        const placeholders = targetIps.map(() => '?').join(',');
+        const queryParams = [cleanTarget, ...targetIps];
+
+        const [compHits] = await pool.query(
+          `SELECT 
+            vh.id,
+            vh.target_store AS competitor_store,
+            vh.visitor_ip,
+            vh.visitor_id,
+            vh.page_url,
+            vh.referrer,
+            vh.browser,
+            vh.duration_seconds,
+            vh.visited_at,
+            s.company_name AS identified_company,
+            s.industry,
+            s.website AS identified_website
+           FROM svt_visitor_hits vh
+           LEFT JOIN svt_stores s ON s.id = vh.matched_store_id
+           WHERE vh.target_store != ?
+             AND vh.visitor_ip IN (${placeholders})
+           ORDER BY vh.visited_at DESC
+           LIMIT 200`,
+          queryParams
+        );
+
+        // Filter by merchant's configured competitor domains if specified, or return network matches
+        footprintMatches = compHits.filter(hit => {
+          if (competitorDomains.length === 0) return true;
+          const compDomain = (hit.competitor_store || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+          return competitorDomains.some(d => compDomain.includes(d));
+        });
+      }
+
+      return res.json({
+        success: true,
+        matches: footprintMatches,
+        total_matched: footprintMatches.length,
+        competitor_watchlist: competitorDomains,
+        db_name: getActiveDbName(),
+        is_connected: true,
+      });
+    } else {
+      // In-Memory Fallback
+      const targetIps = [...new Set(
+        memoryDb.hits
+          .filter(h => !cleanTarget || h.target_store === cleanTarget)
+          .map(h => h.visitor_ip)
+      )];
+
+      footprintMatches = memoryDb.hits
+        .filter(h => h.target_store !== cleanTarget && targetIps.includes(h.visitor_ip))
+        .map(h => {
+          const compInfo = memoryDb.stores.find(s => s.id === h.matched_store_id);
+          return {
+            id: h.id,
+            competitor_store: h.target_store,
+            visitor_ip: h.visitor_ip,
+            visitor_id: h.visitor_id,
+            page_url: h.page_url,
+            referrer: h.referrer,
+            browser: h.browser,
+            duration_seconds: h.duration_seconds,
+            visited_at: h.visited_at,
+            identified_company: compInfo?.company_name || 'B2B Enterprise',
+            industry: compInfo?.industry || 'Enterprise Commercial',
+            identified_website: compInfo?.website || compInfo?.site_url || '',
+          };
+        })
+        .filter(hit => {
+          if (competitorDomains.length === 0) return true;
+          const compDomain = (hit.competitor_store || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+          return competitorDomains.some(d => compDomain.includes(d));
+        });
+
+      return res.json({
+        success: true,
+        matches: footprintMatches,
+        total_matched: footprintMatches.length,
+        competitor_watchlist: competitorDomains,
+        db_name: getActiveDbName(),
+        is_connected: false,
+      });
+    }
+  } catch (err) {
+    console.error('Error in /api/v1/analytics/footprint:', err);
+    res.status(500).json({ error: 'Failed to fetch competitor footprint', details: err.message });
+  }
+});
+
+// ============================================================================
+// 3. Merchant Dashboard API (Scoped Strictly to Current Store)
+// ============================================================================
 app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
   try {
     const rawTarget = req.query.storeUrl || '';

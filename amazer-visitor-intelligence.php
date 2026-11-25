@@ -348,7 +348,7 @@ function amazer_via_register_admin_dashboard_menu() {
         30
     );
 
-    // Primary Submenus: Dashboard, Traffic, Firmography, High Intent, Conversion, Slipped, Settings
+    // Primary Submenus: Dashboard, Traffic, Firmography, High Intent, Conversion, Slipped, Footprint, Settings
     $submenus = array(
         'dashboard'    => __( 'Dashboard', 'amazer-visitor-intelligence' ),
         'traffic'      => __( 'Traffic', 'amazer-visitor-intelligence' ),
@@ -356,6 +356,7 @@ function amazer_via_register_admin_dashboard_menu() {
         'high_intent'  => __( 'High Intent', 'amazer-visitor-intelligence' ),
         'conversion'   => __( 'Conversion', 'amazer-visitor-intelligence' ),
         'slipped'      => __( 'Slipped', 'amazer-visitor-intelligence' ),
+        'footprint'    => __( 'Footprint', 'amazer-visitor-intelligence' ),
         'settings'     => __( 'Settings', 'amazer-visitor-intelligence' ),
     );
 
@@ -392,6 +393,8 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
         $initial_tab = 'conversion';
     } elseif ( strpos( (string) $hook_suffix, 'demographic' ) !== false ) {
         $initial_tab = 'demographic';
+    } elseif ( strpos( (string) $hook_suffix, 'footprint' ) !== false ) {
+        $initial_tab = 'footprint';
     } elseif ( strpos( (string) $hook_suffix, 'slipped' ) !== false ) {
         $initial_tab = 'slipped';
     } elseif ( strpos( (string) $hook_suffix, 'settings' ) !== false ) {

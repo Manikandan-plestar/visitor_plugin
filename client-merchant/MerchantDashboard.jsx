@@ -22,6 +22,7 @@ import FirmographicTab from './pages/FirmographicTab';
 import DemographicTab from './pages/DemographicTab';
 import HighIntentTab from './pages/HighIntentTab';
 import ConversionTab from './pages/ConversionTab';
+import FootprintTab from './pages/FootprintTab';
 import SlippedTab from './pages/SlippedTab';
 import SettingsTab from './pages/SettingsTab';
 
@@ -247,6 +248,7 @@ export default function MerchantDashboard() {
       if (page.includes('firmographic')) return 'firmographic';
       if (page.includes('high_intent') || page.includes('opportunity')) return 'high_intent';
       if (page.includes('conversion')) return 'conversion';
+      if (page.includes('footprint')) return 'footprint';
       if (page.includes('demographic')) return 'demographic';
       if (page.includes('slipped')) return 'slipped';
       if (page.includes('settings')) return 'settings';
@@ -745,6 +747,20 @@ export default function MerchantDashboard() {
             allHits={allHits}
             slippedEnabled={slippedEnabled}
             slippedWindow={slippedWindow}
+            onNavigateTab={(tab) => handleTabSwitch(tab)}
+          />
+        )}
+        {activeTab === 'footprint' && (
+          <FootprintTab
+            companies={companies}
+            generalVisitors={combinedGeneralVisitors}
+            allHits={allHits}
+            competitorUrls={competitorUrls}
+            wpSettings={wpSettings}
+            onSaveCompetitors={async (urls) => {
+              setCompetitorUrls(urls);
+              await handleSaveSlippedSettings(slippedEnabled, slippedWindow, urls);
+            }}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
           />
         )}
