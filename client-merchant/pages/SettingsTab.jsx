@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import {
-  SlidersHorizontal,
   Zap,
   Target,
   ShoppingBag,
   Server,
   ShieldCheck,
   Check,
-  AlertCircle,
   Save,
   RefreshCw,
   ExternalLink,
   Lock,
+  Crown,
 } from 'lucide-react';
 
 export default function SettingsTab({
@@ -23,6 +22,9 @@ export default function SettingsTab({
   slippedWindow = '48h',
   competitorUrls = '',
   trackingEnabled = false,
+  planMeta = {},
+  billingInfo = {},
+  onOpenUpgrade,
   onSaveAnalyticsUrls,
   onSaveOpportunitySettings,
   onSaveSlippedSettings,
@@ -51,8 +53,28 @@ export default function SettingsTab({
   const [apiSaved, setApiSaved] = useState(false);
   const [apiSaving, setApiSaving] = useState(false);
 
+  const [urlLimitWarning, setUrlLimitWarning] = useState('');
+
+  const isPremium = planMeta?.plan_tier === 'premium';
+  const isLocalApi =
+    apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes('4000');
+
   const handleSaveAnalytics = async (e) => {
     e.preventDefault();
+    setUrlLimitWarning('');
+
+    if (!isPremium) {
+      const hiCount = hiUrls.split(',').map((s) => s.trim()).filter(Boolean).length;
+      const convCount = convUrls.split(',').map((s) => s.trim()).filter(Boolean).length;
+      if (hiCount > 2 || convCount > 2) {
+        setUrlLimitWarning(
+          'Free plan supports up to 2 High Intent URLs and 2 Conversion URLs. Upgrade to Premium for unlimited rules.'
+        );
+        if (onOpenUpgrade) onOpenUpgrade();
+        return;
+      }
+    }
+
     setAnalyticsSaving(true);
     setAnalyticsSaved(false);
     try {
@@ -105,333 +127,441 @@ export default function SettingsTab({
   };
 
   return (
-    <div className="space-y-6 w-full max-w-full">
-      {/* Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <SlidersHorizontal className="w-5 h-5 text-blue-600" />
-          Settings & Tracking Configuration
-        </h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Configure High Intent URLs, Conversion target URLs, and engagement dwell time thresholds.
-        </p>
-      </div>
-
-      {/* 1. High Intent & Conversion URL Settings Form */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-6">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+    <div className="space-y-4 w-full max-w-full">
+      {/* Full-Width Top Plan & Telemetry Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-2xl p-5 shadow-sm border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <span className="p-2.5 rounded-2xl bg-white/10 border border-white/15 text-amber-300 shrink-0">
+            <Crown className="w-5 h-5" />
+          </span>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">High Intent & Conversion URL Rules</h3>
-            <p className="text-xs text-slate-500">
-              Specify storefront page patterns to detect visitor buying intent and recorded conversions.
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-bold text-white">
+                {isPremium ? 'Amazer Premium Active' : 'Normal (Free) Plan'}
+              </h2>
+              <span
+                className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                  isPremium
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                    : 'bg-amber-400/20 text-amber-300 border-amber-400/30'
+                }`}
+              >
+                {isPremium ? 'Unlimited Access' : 'Limited Tier'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {isPremium
+                ? `All 7 intelligence screens unlocked${
+                    billingInfo?.paypal_subscription_id
+                      ? ` • PayPal ID: ${billingInfo.paypal_subscription_id}`
+                      : ''
+                  }`
+                : 'Free limits: 5 companies, 15 traffic rows, 5 intent/conversion leads, 3 slipped, 1 competitor & 3 footprint hits.'}
             </p>
           </div>
-          <span className="text-[10px] font-bold px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full uppercase">
-            Active Rules
-          </span>
         </div>
 
-        <form onSubmit={handleSaveAnalytics} className="space-y-5">
-          {/* High Intent Section */}
-          <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
-                <Zap className="w-4 h-4 fill-amber-500 text-amber-500" />
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Quick Telemetry Switch */}
+          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-white/10 border border-white/15">
+            <span className="text-xs font-semibold text-slate-200">
+              Tracking: {trackingEnabled ? 'Active' : 'Paused'}
+            </span>
+            <button
+              type="button"
+              onClick={onToggleTracking}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                trackingEnabled ? 'bg-emerald-500' : 'bg-slate-500'
+              }`}
+              aria-label="Toggle Storefront Tracking"
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ${
+                  trackingEnabled ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {!isPremium && onOpenUpgrade && (
+            <button
+              type="button"
+              onClick={onOpenUpgrade}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Crown className="w-3.5 h-3.5" />
+              <span>Upgrade with PayPal</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Full-Width 2-Column Bento Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+        {/* Card 1: Intent & Conversion URL Rules */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Zap className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    High Intent & Conversion URL Rules
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Classify buying intent pages and goal conversion paths.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {isPremium ? 'Unlimited' : 'Free: Max 2 each'}
               </span>
+            </div>
+
+            {urlLimitWarning && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  {urlLimitWarning}
+                </span>
+                {onOpenUpgrade && (
+                  <button
+                    type="button"
+                    onClick={onOpenUpgrade}
+                    className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-bold text-[11px] shrink-0 cursor-pointer"
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
+            )}
+
+            <form id="amazer-rules-form" onSubmit={handleSaveAnalytics} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    High Intent URLs
+                  </label>
+                  <textarea
+                    rows="3"
+                    value={hiUrls}
+                    onChange={(e) => setHiUrls(e.target.value)}
+                    placeholder="/pricing, /checkout"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <Target className="w-3.5 h-3.5 text-rose-500" />
+                    Conversion Page URLs
+                  </label>
+                  <textarea
+                    rows="3"
+                    value={convUrls}
+                    onChange={(e) => setConvUrls(e.target.value)}
+                    placeholder="/thank-you, /order-received"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <div className="text-xs font-bold text-slate-800">
+                    Minimum Engagement Dwell Duration
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Seconds required on a High Intent page to qualify.
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="number"
+                    min="5"
+                    max="600"
+                    value={oppDuration}
+                    onChange={(e) => setOppDuration(e.target.value)}
+                    className="w-20 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                  <span className="text-xs text-slate-500">sec</span>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            {analyticsSaved ? (
+              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                <Check className="w-4 h-4" /> Rules saved!
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400">Saved to WordPress options</span>
+            )}
+            <button
+              type="submit"
+              form="amazer-rules-form"
+              disabled={analyticsSaving}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {analyticsSaving ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              {analyticsSaving ? 'Saving...' : 'Save Rules'}
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: Competitors & Slipped Attribution */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-orange-50 text-orange-600 rounded-xl">
+                  <ShoppingBag className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Competitors & Slipped Attribution
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Manage competitor watchlist and cross-store attribution window.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {slpEnabled ? 'Active' : 'Disabled'}
+              </span>
+            </div>
+
+            <form id="amazer-slipped-form" onSubmit={handleSaveSlp} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">Cross-Store Network</div>
+                    <div className="text-[11px] text-slate-500">Multi-store journey match</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSlpEnabled(!slpEnabled)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                      slpEnabled ? 'bg-indigo-600' : 'bg-slate-300'
+                    }`}
+                    aria-label="Toggle Cross-Store Network"
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ${
+                        slpEnabled ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Attribution Window
+                  </label>
+                  <select
+                    value={slpWindow}
+                    onChange={(e) => setSlpWindow(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white cursor-pointer"
+                  >
+                    <option value="24h">24 Hours</option>
+                    <option value="48h">48 Hours (Standard)</option>
+                    <option value="7d">7 Days</option>
+                    <option value="14d">14 Days</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className="text-xs font-bold text-slate-800 block">
-                  High Intent URLs:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Monitored Competitor Domains
                 </label>
-                <span className="text-[11px] text-slate-500">
-                  Multiple URLs separated by comma (e.g. <code>/pricing, /checkout, /product/industrial-turbine-sensor</code>)
+                <textarea
+                  rows={3}
+                  value={compUrls}
+                  onChange={(e) => setCompUrls(e.target.value)}
+                  placeholder="competitor-a.com, competitor-b.com"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Comma-separated domains tracked in Footprint & Slipped screens.
                 </span>
               </div>
-            </div>
-            <textarea
-              rows="3"
-              value={hiUrls}
-              onChange={(e) => setHiUrls(e.target.value)}
-              placeholder="/pricing, /product/industrial-turbine-sensor, /checkout, /four-plans, /contact-sales"
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-amber-500 shadow-2xs"
-              required
-            />
+            </form>
+          </div>
 
-            <div className="pt-1">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Minimum Engagement Dwell Duration (Seconds):
-              </label>
-              <div className="flex items-center gap-2 max-w-xs">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            {slpSaved ? (
+              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                <Check className="w-4 h-4" /> Preferences saved!
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400">Saved to WordPress options</span>
+            )}
+            <button
+              type="submit"
+              form="amazer-slipped-form"
+              disabled={slpSaving}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {slpSaving ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              {slpSaving ? 'Saving...' : 'Save Preferences'}
+            </button>
+          </div>
+        </div>
+
+        {/* Card 3: Backend API Endpoint */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-slate-100 text-slate-700 rounded-xl">
+                  <Server className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Central Intelligence Backend Endpoint
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Master switch configured in <code>config.php</code>.
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  isLocalApi
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}
+              >
+                {isLocalApi ? 'LOCAL DEV (4000)' : 'LIVE CLOUD (3011)'}
+              </span>
+            </div>
+
+            <form id="amazer-api-form" onSubmit={handleSaveApi} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Backend API URL
+                </label>
                 <input
-                  type="number"
-                  min="5"
-                  max="600"
-                  value={oppDuration}
-                  onChange={(e) => setOppDuration(e.target.value)}
-                  className="w-32 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-amber-500 shadow-2xs"
+                  type="url"
+                  value={apiUrl}
+                  onChange={(e) => setApiUrl(e.target.value)}
+                  placeholder="https://apps.plestarinc.com:3011 or http://localhost:4000"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
                   required
                 />
-                <span className="text-xs text-slate-500 font-medium">seconds</span>
               </div>
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Minimum active time on high-intent pages before classifying as a qualified lead.
-              </span>
-            </div>
+            </form>
           </div>
 
-          {/* Conversion Section */}
-          <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-200/80 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-rose-100 text-rose-700 rounded-lg">
-                <Target className="w-4 h-4 text-rose-600" />
-              </span>
-              <div>
-                <label className="text-xs font-bold text-slate-800 block">
-                  Conversion Page URLs:
-                </label>
-                <span className="text-[11px] text-slate-500">
-                  Multiple URLs separated by comma (e.g. <code>/thank-you, /order-received, /order-confirmed, /checkout/success</code>)
-                </span>
-              </div>
-            </div>
-            <textarea
-              rows="3"
-              value={convUrls}
-              onChange={(e) => setConvUrls(e.target.value)}
-              placeholder="/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout"
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-rose-500 shadow-2xs"
-              required
-            />
-            <span className="text-[11px] text-slate-400 block">
-              Visits to any of these URLs record a goal conversion event.
-            </span>
-          </div>
-
-          {/* Submit Actions */}
-          <div className="flex items-center justify-between pt-2">
-            {analyticsSaved ? (
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                <Check className="w-4 h-4 text-emerald-600" />
-                High Intent & Conversion URLs saved successfully!
-              </span>
-            ) : (
-              <span className="text-xs text-slate-400">Settings save to WordPress database</span>
-            )}
-            <button
-              type="submit"
-              disabled={analyticsSaving}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {analyticsSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {analyticsSaving ? 'Saving...' : 'Save Configuration'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* 2. Slipped Settings Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 bg-orange-100 text-orange-700 rounded-xl">
-              <ShoppingBag className="w-4 h-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Slipped Cross-Store Tracking Configuration</h3>
-              <p className="text-xs text-slate-500">
-                Configure competitor watchlist and anonymous cross-store conversion detection parameters.
-              </p>
-            </div>
-          </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full uppercase">
-            Active
-          </span>
-        </div>
-
-        <form onSubmit={handleSaveSlp} className="space-y-4 pt-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Cross-Store Consortium Participation:
-              </label>
-              <select
-                value={slpEnabled ? 'yes' : 'no'}
-                onChange={(e) => setSlpEnabled(e.target.value === 'yes')}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
-              >
-                <option value="yes">Enabled (Detect Multi-Store Journeys)</option>
-                <option value="no">Disabled (Single-Storefront Only)</option>
-              </select>
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Correlates anonymous IP & visitor touchpoints across competitor stores without disclosing identities.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Attribution Tracking Window:
-              </label>
-              <select
-                value={slpWindow}
-                onChange={(e) => setSlpWindow(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
-              >
-                <option value="24h">24 Hours (Fast-Cycle Retail)</option>
-                <option value="48h">48 Hours (Standard B2B / eCommerce)</option>
-                <option value="7d">7 Days (Longer Procurement Evaluation)</option>
-                <option value="14d">14 Days (Enterprise RFQ Cycles)</option>
-              </select>
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Maximum elapsed time between initial catalog visit on your store and external checkout.
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Monitored Competitor Store URLs:
-            </label>
-            <textarea
-              rows={2}
-              value={compUrls}
-              onChange={(e) => setCompUrls(e.target.value)}
-              placeholder="https://competitor-b.com, https://competitor-c.com, https://rival-store.net"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500 focus:bg-white"
-            />
-            <span className="text-[11px] text-slate-400 mt-1 block">
-              Comma-separated URLs of competitor storefronts. When a prospect visits your store and later converts on any of these endpoints, an anonymous Slipped event is logged in your Slipped tab.
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            {slpSaved ? (
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <Check className="w-4 h-4" /> Slipped journey preferences saved!
-              </span>
-            ) : (
-              <span className="text-xs text-slate-400">Settings save to WordPress options</span>
-            )}
-            <button
-              type="submit"
-              disabled={slpSaving}
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              {slpSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {slpSaving ? 'Saving...' : 'Save Slipped Preferences'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* 3. API Server Endpoint Configuration */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 bg-slate-100 text-slate-700 rounded-xl">
-              <Server className="w-4 h-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Central Intelligence Backend Endpoint</h3>
-              <p className="text-xs text-slate-500">
-                Configure your central Node.js reverse-WHOIS resolution server.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSaveApi} className="space-y-4 pt-1">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-slate-700">
-                Backend API URL:
-              </label>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes('4000'))
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              }`}>
-                {(apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes('4000'))
-                  ? 'Active Mode: LOCAL DEV (4000)'
-                  : 'Active Mode: LIVE CLOUD (3011)'}
-              </span>
-            </div>
-            <input
-              type="url"
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="https://apps.plestarinc.com:3011 or http://localhost:4000"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-blue-500 focus:bg-white"
-              required
-            />
-            <span className="text-[11px] text-slate-400 mt-1 block">
-              Configured via <code className="text-slate-600 font-bold">config.php</code> (Master switch: <code>'local'</code> or <code>'live'</code>).
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             {apiSaved ? (
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <Check className="w-4 h-4" /> Endpoint configuration saved successfully!
+              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                <Check className="w-4 h-4" /> Endpoint updated!
               </span>
             ) : (
-              <span className="text-xs text-slate-400">Stores in WordPress options</span>
+              <span className="text-[11px] text-slate-400">Saved to WordPress options</span>
             )}
             <button
               type="submit"
+              form="amazer-api-form"
               disabled={apiSaving}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              {apiSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {apiSaving ? 'Saving...' : 'Update API Endpoint'}
+              {apiSaving ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              {apiSaving ? 'Saving...' : 'Update Endpoint'}
             </button>
           </div>
-        </form>
-      </div>
-
-      {/* 4. Privacy & Consent Notice (Guideline 7 Compliance) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <ShieldCheck className="w-4 h-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Privacy & Storefront Telemetry Consent</h3>
-              <p className="text-xs text-slate-500">
-                WordPress Guideline 7 Compliance — Zero automatic storefront tracking without explicit consent.
-              </p>
-            </div>
-          </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
-            trackingEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-          }`}>
-            {trackingEnabled ? 'Active' : 'Paused'}
-          </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-          <p className="text-xs text-slate-600 max-w-lg">
-            Storefront visitor beacon is currently {trackingEnabled ? <strong className="text-emerald-700 font-bold">Enabled</strong> : <strong className="text-amber-700 font-bold">Paused</strong>}.
-            Review our{' '}
-            <a href="https://plestar.net/amazer-analytics/terms.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold hover:underline">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="https://plestar.net/amazer-analytics/privacy.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold hover:underline">
-              Privacy Policy
-            </a>.
-          </p>
+        {/* Card 4: Privacy, Consent & Legal */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                  <ShieldCheck className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Privacy & WordPress Guideline 7 Consent
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Storefront telemetry requires explicit administrator opt-in.
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${
+                  trackingEnabled
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+              >
+                {trackingEnabled ? 'Active' : 'Paused'}
+              </span>
+            </div>
 
-          <button
-            type="button"
-            onClick={onToggleTracking}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              trackingEnabled
-                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-            }`}
-          >
-            {trackingEnabled ? 'Pause Tracking' : 'Enable Amazer Visitor Intelligence'}
-          </button>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Visitor intelligence is currently{' '}
+              <strong className={trackingEnabled ? 'text-emerald-700' : 'text-amber-700'}>
+                {trackingEnabled ? 'Enabled' : 'Paused'}
+              </strong>
+              . Review our{' '}
+              <a
+                href="https://plestar.net/amazer-analytics/terms.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 font-semibold hover:underline inline-flex items-center gap-0.5"
+              >
+                Terms of Service <ExternalLink className="w-3 h-3" />
+              </a>{' '}
+              and{' '}
+              <a
+                href="https://plestar.net/amazer-analytics/privacy.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 font-semibold hover:underline inline-flex items-center gap-0.5"
+              >
+                Privacy Policy <ExternalLink className="w-3 h-3" />
+              </a>
+              .
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            <span className="text-[11px] text-slate-400">Consent status</span>
+            <button
+              type="button"
+              onClick={onToggleTracking}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                trackingEnabled
+                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {trackingEnabled ? 'Pause Tracking' : 'Enable Visitor Intelligence'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

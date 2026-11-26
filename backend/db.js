@@ -85,12 +85,36 @@ async function createTables() {
       industry VARCHAR(128) NULL,
       acquisition_channel VARCHAR(128) NULL,
       is_partner_store TINYINT(1) DEFAULT 0,
+      store_api_key VARCHAR(128) NULL,
+      plan_tier VARCHAR(32) DEFAULT 'free',
+      subscription_status VARCHAR(32) DEFAULT 'inactive',
+      paypal_subscription_id VARCHAR(128) NULL,
+      paypal_plan_id VARCHAR(128) NULL,
+      plan_expires_at DATETIME NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_ip (activation_ip),
-      INDEX idx_status (status)
+      INDEX idx_status (status),
+      INDEX idx_plan_tier (plan_tier)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
+
+  // Safe schema migration for existing svt_stores tables
+  const storeMigrations = [
+    "ALTER TABLE svt_stores ADD COLUMN store_api_key VARCHAR(128) NULL",
+    "ALTER TABLE svt_stores ADD COLUMN plan_tier VARCHAR(32) DEFAULT 'free'",
+    "ALTER TABLE svt_stores ADD COLUMN subscription_status VARCHAR(32) DEFAULT 'inactive'",
+    "ALTER TABLE svt_stores ADD COLUMN paypal_subscription_id VARCHAR(128) NULL",
+    "ALTER TABLE svt_stores ADD COLUMN paypal_plan_id VARCHAR(128) NULL",
+    "ALTER TABLE svt_stores ADD COLUMN plan_expires_at DATETIME NULL",
+  ];
+  for (const sql of storeMigrations) {
+    try {
+      await pool.query(sql);
+    } catch (e) {
+      // Column already exists (ER_DUP_FIELDNAME); safe to ignore
+    }
+  }
 
   // 2. Visitor Page Hits Table
   await pool.query(`

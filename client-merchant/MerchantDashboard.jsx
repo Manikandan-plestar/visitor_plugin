@@ -14,8 +14,10 @@ import {
   Trash2,
   Sparkles,
   Target,
+  Crown,
 } from 'lucide-react';
 
+import PayPalUpgradeModal from './components/PayPalUpgradeModal';
 import DashboardTab from './pages/DashboardTab';
 import TrafficTab from './pages/TrafficTab';
 import FirmographicTab from './pages/FirmographicTab';
@@ -299,6 +301,9 @@ export default function MerchantDashboard() {
   const [generalVisitors, setGeneralVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [planMeta, setPlanMeta] = useState({ plan_tier: 'free', subscription_status: 'inactive', limits: {}, usage: {} });
+  const [billingInfo, setBillingInfo] = useState({ plan_tier: 'free', subscription_status: 'inactive', paypal: {} });
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Selected company ID in Firmographic view
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
@@ -369,12 +374,20 @@ export default function MerchantDashboard() {
         } catch (e) {}
       }
 
+      const apiHeaders = {};
+      if (wpSettings.storeApiKey) {
+        apiHeaders['x-store-key'] = wpSettings.storeApiKey;
+      }
+
       const url = `${wpSettings.apiUrl.replace(/\/+$/, '')}/api/v1/analytics/visitor-detail?storeUrl=${encodeURIComponent(
         wpSettings.storeUrl
       )}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: apiHeaders });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (data.plan_meta) {
+        setPlanMeta(data.plan_meta);
+      }
       if (data.companies && data.companies.length > 0) {
         setLiveCompanies(data.companies);
         setSelectedCompanyId((prev) => {
@@ -393,8 +406,34 @@ export default function MerchantDashboard() {
     }
   };
 
+  const fetchBillingStatus = async () => {
+    try {
+      const apiHeaders = {};
+      if (wpSettings.storeApiKey) {
+        apiHeaders['x-store-key'] = wpSettings.storeApiKey;
+      }
+      const res = await fetch(
+        `${wpSettings.apiUrl.replace(/\/+$/, '')}/api/v1/billing/status?storeUrl=${encodeURIComponent(wpSettings.storeUrl)}`,
+        { headers: apiHeaders }
+      );
+      if (res.ok) {
+        const bData = await res.json();
+        setBillingInfo(bData);
+        if (bData.plan_tier) {
+          setPlanMeta((prev) => ({
+            ...prev,
+            plan_tier: bData.plan_tier,
+            subscription_status: bData.subscription_status,
+            limits: bData.limits || prev.limits,
+          }));
+        }
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     fetchLiveAnalytics();
+    fetchBillingStatus();
   }, []);
 
   // Filtered Demo Data
@@ -434,6 +473,7 @@ export default function MerchantDashboard() {
     return combinedCompanies.map((c) => ({
       id: c.id,
       is_demo: Boolean(c.is_demo),
+      is_locked: Boolean(c.is_locked),
       company_name: c.company_name || 'Unidentified Company',
       activation_ip: c.activation_ip || c.hits?.[0]?.visitor_ip || 'Corporate Subnet',
       initials: (c.company_name || 'UC')
@@ -605,7 +645,25 @@ export default function MerchantDashboard() {
         </div>
 
         {/* Top Controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Plan Status / Upgrade Pill */}
+          {planMeta.plan_tier === 'premium' ? (
+            <span className="px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-2xs flex items-center gap-1.5">
+              <Crown className="w-3.5 h-3.5 text-amber-300" />
+              <span>Premium Active</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowUpgradeModal(true)}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Upgrade to Premium via PayPal for unlimited access"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-600" />
+              <span>Free Plan • Upgrade</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleToggleTracking}
@@ -693,6 +751,8 @@ export default function MerchantDashboard() {
             opportunityDuration={opportunityDuration}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
           />
         )}
 
@@ -703,6 +763,8 @@ export default function MerchantDashboard() {
             allHits={allHits}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
           />
         )}
 
@@ -711,6 +773,8 @@ export default function MerchantDashboard() {
             companies={companies}
             selectedCompanyId={selectedCompanyId}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
           />
         )}
 
@@ -724,6 +788,8 @@ export default function MerchantDashboard() {
             onNavigateTab={(tab) => handleTabSwitch(tab)}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
             onSaveHighIntentUrls={(urls) => setHighIntentUrls(urls)}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
           />
         )}
 
@@ -736,6 +802,8 @@ export default function MerchantDashboard() {
             onNavigateTab={(tab) => handleTabSwitch(tab)}
             onSelectCompany={(id) => setSelectedCompanyId(id)}
             onSaveConversionUrls={(urls) => setConversionUrls(urls)}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
           />
         )}
 
@@ -748,6 +816,8 @@ export default function MerchantDashboard() {
             slippedEnabled={slippedEnabled}
             slippedWindow={slippedWindow}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
           />
         )}
         {activeTab === 'footprint' && (
@@ -757,6 +827,8 @@ export default function MerchantDashboard() {
             allHits={allHits}
             competitorUrls={competitorUrls}
             wpSettings={wpSettings}
+            planMeta={planMeta}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
             onSaveCompetitors={async (urls) => {
               setCompetitorUrls(urls);
               await handleSaveSlippedSettings(slippedEnabled, slippedWindow, urls);
@@ -774,6 +846,9 @@ export default function MerchantDashboard() {
             slippedWindow={slippedWindow}
             competitorUrls={competitorUrls}
             trackingEnabled={trackingEnabled}
+            planMeta={planMeta}
+            billingInfo={billingInfo}
+            onOpenUpgrade={() => setShowUpgradeModal(true)}
             onSaveAnalyticsUrls={handleSaveAnalyticsUrls}
             onSaveOpportunitySettings={handleSaveOpportunitySettings}
             onSaveSlippedSettings={handleSaveSlippedSettings}
@@ -782,6 +857,19 @@ export default function MerchantDashboard() {
           />
         )}
       </div>
+
+      {/* PayPal Subscription Upgrade Modal */}
+      <PayPalUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        billingInfo={billingInfo}
+        wpSettings={wpSettings}
+        onSubscriptionSuccess={async () => {
+          await fetchBillingStatus();
+          await fetchLiveAnalytics();
+          setTimeout(() => setShowUpgradeModal(false), 1200);
+        }}
+      />
     </div>
   );
 }

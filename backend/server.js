@@ -11,12 +11,198 @@ const dns = require('dns').promises;
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const crypto = require('crypto');
 const { initDb, getPool, getIsConnected, getCurrentDbName } = require('./db');
 const getActiveDbName = () => (typeof getCurrentDbName === 'function' ? getCurrentDbName() : (process.env.DB_NAME || 'store_visiting'));
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 const STAFF_SECRET_KEY = process.env.STAFF_SECRET_KEY || 'svt_secret_staff_key_2026';
+
+// ============================================================================
+// Freemium Plan Limits & Security Helpers
+// ============================================================================
+const FREE_LIMITS = {
+  MAX_COMPANIES: 5,
+  MAX_GENERAL_VISITORS: 15,
+  MAX_FOOTPRINT_MATCHES: 3,
+  MAX_COMPETITOR_DOMAINS: 1,
+  RETENTION_DAYS: 7,
+};
+
+// Lightweight Sliding-Window Rate Limiter (120 requests/min per IP)
+const rateLimitBuckets = new Map();
+function rateLimitMiddleware(req, res, next) {
+  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxReq = 120;
+  let bucket = rateLimitBuckets.get(ip);
+  if (!bucket || now - bucket.start > windowMs) {
+    bucket = { start: now, count: 1 };
+    rateLimitBuckets.set(ip, bucket);
+  } else {
+    bucket.count += 1;
+  }
+  if (bucket.count > maxReq) {
+    return res.status(429).json({ error: 'Too many requests. Please slow down.' });
+  }
+  next();
+}
+
+function generateStoreApiKey() {
+  return 'amz_sk_' + crypto.randomBytes(24).toString('hex');
+}
+
+async function getStoreRecord(cleanTarget) {
+  if (!cleanTarget) return null;
+  if (getIsConnected()) {
+    const [rows] = await getPool().query('SELECT * FROM svt_stores WHERE site_url = ? LIMIT 1', [cleanTarget]);
+    return rows[0] || null;
+  }
+  return memoryDb.stores.find((s) => s.site_url === cleanTarget) || null;
+}
+
+async function verifyStoreAccess(req, cleanTarget) {
+  const store = await getStoreRecord(cleanTarget);
+  if (!store) return { authorized: true, store: null };
+  if (!store.store_api_key) return { authorized: true, store };
+
+  const providedKey = (req.headers['x-store-key'] || req.query.storeKey || '').trim();
+  if (!providedKey) {
+    return { authorized: true, store }; // Allow initial transition if legacy client hasn't synced key yet
+  }
+  if (providedKey !== store.store_api_key && providedKey !== STAFF_SECRET_KEY) {
+    return { authorized: false, store: null };
+  }
+  return { authorized: true, store };
+}
+
+function isStorePremium(store) {
+  if (!store) return false;
+  if ((store.plan_tier || 'free').toLowerCase() !== 'premium') return false;
+  if ((store.subscription_status || 'inactive').toLowerCase() !== 'active') return false;
+  if (store.plan_expires_at && new Date(store.plan_expires_at).getTime() < Date.now()) return false;
+  return true;
+}
+
+function applyCompanyPlanLimits(companyList, isPremium) {
+  const total = companyList.length;
+  if (isPremium) {
+    return {
+      companies: companyList.map((c) => ({ ...c, is_locked: false })),
+      unlockedCount: total,
+      totalCount: total,
+    };
+  }
+  const mapped = companyList.map((c, idx) => {
+    if (idx < FREE_LIMITS.MAX_COMPANIES) {
+      return { ...c, is_locked: false };
+    }
+    return {
+      ...c,
+      is_locked: true,
+      physical_address: 'Locked — Upgrade to Premium to reveal address',
+      telephone: '+•• ••• ••••',
+      official_email: '••••••@company.com',
+      website: 'Locked (Premium)',
+      linkedin_url: '',
+      twitter_url: '',
+      activation_ip: c.activation_ip ? c.activation_ip.replace(/\.\d+\.\d+$/, '.•••.•••') : '•••.•••.•••.•••',
+    };
+  });
+  return {
+    companies: mapped,
+    unlockedCount: Math.min(total, FREE_LIMITS.MAX_COMPANIES),
+    totalCount: total,
+  };
+}
+
+function applyFootprintPlanLimits(matches, isPremium) {
+  const total = matches.length;
+  if (isPremium) {
+    return {
+      matches: matches.map((m) => ({ ...m, is_locked: false })),
+      unlockedCount: total,
+      totalCount: total,
+    };
+  }
+  const mapped = matches.map((m, idx) => {
+    if (idx < FREE_LIMITS.MAX_FOOTPRINT_MATCHES) {
+      return { ...m, is_locked: false };
+    }
+    return {
+      ...m,
+      is_locked: true,
+      visitor_ip: m.visitor_ip ? m.visitor_ip.replace(/\.\d+\.\d+$/, '.•••.•••') : '•••.•••.•••.•••',
+      identified_company: 'Locked Enterprise Account (Upgrade)',
+      page_url: '/•••••• (Upgrade to Reveal)',
+      referrer: 'Locked (Premium)',
+      identified_website: '',
+    };
+  });
+  return {
+    matches: mapped,
+    unlockedCount: Math.min(total, FREE_LIMITS.MAX_FOOTPRINT_MATCHES),
+    totalCount: total,
+  };
+}
+
+// Server-side PayPal REST API Helper (Secrets stay strictly on backend)
+function getPayPalConfig() {
+  const mode = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase() === 'live' ? 'live' : 'sandbox';
+  return {
+    mode,
+    host: mode === 'live' ? 'api-m.paypal.com' : 'api-m.sandbox.paypal.com',
+    clientId: (process.env.PAYPAL_CLIENT_ID || '').trim(),
+    clientSecret: (process.env.PAYPAL_CLIENT_SECRET || '').trim(),
+    planId: (process.env.PAYPAL_PREMIUM_PLAN_ID || '').trim(),
+  };
+}
+
+function httpsJsonRequest(options, bodyStr = null) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = data ? JSON.parse(data) : {};
+          resolve({ status: res.statusCode, data: parsed });
+        } catch (e) {
+          resolve({ status: res.statusCode, data: { raw: data } });
+        }
+      });
+    });
+    req.on('error', reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function getPayPalAccessToken() {
+  const cfg = getPayPalConfig();
+  if (!cfg.clientId || !cfg.clientSecret) {
+    throw new Error('PayPal server credentials (PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET) are not configured.');
+  }
+  const auth = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString('base64');
+  const resp = await httpsJsonRequest(
+    {
+      hostname: cfg.host,
+      path: '/v1/oauth2/token',
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    },
+    'grant_type=client_credentials'
+  );
+  if (resp.status !== 200 || !resp.data?.access_token) {
+    throw new Error('Failed to authenticate with PayPal OAuth API.');
+  }
+  return { token: resp.data.access_token, cfg };
+}
 
 // Helper: Parse single Master Switch from config.php (AMAZER_ENVIRONMENT: 'local' | 'live')
 function getMasterConfig() {
@@ -459,9 +645,10 @@ app.post('/api/v1/store/activate', async (req, res) => {
       const ind = inheritedCompany ? (inheritedCompany.industry || 'B2B Enterprise') : 'B2B Enterprise';
       const stat = inheritedCompany ? (inheritedCompany.status || 'Verified') : 'Pending';
 
+      const newStoreKey = generateStoreApiKey();
       await pool.query(
-        `INSERT INTO svt_stores (site_url, site_name, activation_ip, status, company_name, physical_address, telephone, official_email, website, industry)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO svt_stores (site_url, site_name, activation_ip, status, company_name, physical_address, telephone, official_email, website, industry, store_api_key, plan_tier, subscription_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'free', 'inactive')
          ON DUPLICATE KEY UPDATE 
            site_name = VALUES(site_name), 
            activation_ip = VALUES(activation_ip),
@@ -471,12 +658,20 @@ app.post('/api/v1/store/activate', async (req, res) => {
            official_email = COALESCE(official_email, VALUES(official_email)),
            website = COALESCE(website, VALUES(website)),
            industry = COALESCE(industry, VALUES(industry)),
+           store_api_key = COALESCE(store_api_key, VALUES(store_api_key)),
            status = CASE WHEN status = 'Verified' THEN 'Verified' WHEN VALUES(status) = 'Verified' THEN 'Verified' ELSE status END,
            updated_at = NOW()`,
-        [cleanUrl, site_name || cleanUrl, activationIp, stat, compName, physAddr, phone, email, web, ind]
+        [cleanUrl, site_name || cleanUrl, activationIp, stat, compName, physAddr, phone, email, web, ind, newStoreKey]
       );
       const [rows] = await pool.query('SELECT * FROM svt_stores WHERE site_url = ?', [cleanUrl]);
-      return res.json({ success: true, store: rows[0], activation_ip: activationIp });
+      return res.json({
+        success: true,
+        store: rows[0],
+        store_api_key: rows[0]?.store_api_key || newStoreKey,
+        plan_tier: rows[0]?.plan_tier || 'free',
+        subscription_status: rows[0]?.subscription_status || 'inactive',
+        activation_ip: activationIp,
+      });
     }
 
     // In-memory fallback
@@ -523,12 +718,17 @@ app.post('/api/v1/store/activate', async (req, res) => {
         official_email: memEmail,
         website: memWeb,
         industry: memInd,
+        store_api_key: generateStoreApiKey(),
+        plan_tier: 'free',
+        subscription_status: 'inactive',
         created_at: nowIso,
       };
       memoryDb.stores.unshift(existing);
     } else {
       existing.activation_ip = activationIp;
       existing.site_name = site_name || existing.site_name;
+      if (!existing.store_api_key) existing.store_api_key = generateStoreApiKey();
+      if (!existing.plan_tier) existing.plan_tier = 'free';
       if (!existing.company_name && memCompName) {
         existing.company_name = memCompName;
         existing.physical_address = memPhysAddr;
@@ -543,6 +743,9 @@ app.post('/api/v1/store/activate', async (req, res) => {
     res.json({
       success: true,
       store: existing,
+      store_api_key: existing.store_api_key,
+      plan_tier: existing.plan_tier || 'free',
+      subscription_status: existing.subscription_status || 'inactive',
       activation_ip: activationIp,
     });
   } catch (err) {
@@ -777,19 +980,27 @@ app.post('/api/v1/track/batch', async (req, res) => {
 });
 
 // ============================================================================
-// 3. Merchant Dashboard API (Scoped Strictly to Current Store)
+// 3. Merchant Dashboard API (Scoped Strictly to Current Store + Plan Limits)
 // ============================================================================
-app.get('/api/v1/analytics/footprint', async (req, res) => {
+app.get('/api/v1/analytics/footprint', rateLimitMiddleware, async (req, res) => {
   try {
     const rawTarget = req.query.storeUrl || '';
     const cleanTarget = normalizeUrl(rawTarget);
+    const access = await verifyStoreAccess(req, cleanTarget);
+    if (!access.authorized) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid store API key' });
+    }
+    const isPremium = isStorePremium(access.store);
     const competitorListStr = req.query.competitors || '';
     
-    // Parse list of competitor domains configured by merchant
-    const competitorDomains = competitorListStr
+    // Parse list of competitor domains configured by merchant (Free plan capped to 1 domain)
+    let competitorDomains = competitorListStr
       .split(',')
       .map(c => c.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
       .filter(Boolean);
+    if (!isPremium && competitorDomains.length > FREE_LIMITS.MAX_COMPETITOR_DOMAINS) {
+      competitorDomains = competitorDomains.slice(0, FREE_LIMITS.MAX_COMPETITOR_DOMAINS);
+    }
 
     let footprintMatches = [];
 
@@ -840,11 +1051,19 @@ app.get('/api/v1/analytics/footprint', async (req, res) => {
         });
       }
 
+      const limited = applyFootprintPlanLimits(footprintMatches, isPremium);
       return res.json({
         success: true,
-        matches: footprintMatches,
-        total_matched: footprintMatches.length,
+        matches: limited.matches,
+        total_matched: limited.totalCount,
+        unlocked_count: limited.unlockedCount,
         competitor_watchlist: competitorDomains,
+        plan_meta: {
+          plan_tier: isPremium ? 'premium' : 'free',
+          subscription_status: access.store?.subscription_status || 'inactive',
+          limits: FREE_LIMITS,
+          limit_reached: !isPremium && limited.totalCount > FREE_LIMITS.MAX_FOOTPRINT_MATCHES,
+        },
         db_name: getActiveDbName(),
         is_connected: true,
       });
@@ -881,11 +1100,19 @@ app.get('/api/v1/analytics/footprint', async (req, res) => {
           return competitorDomains.some(d => compDomain.includes(d));
         });
 
+      const limited = applyFootprintPlanLimits(footprintMatches, isPremium);
       return res.json({
         success: true,
-        matches: footprintMatches,
-        total_matched: footprintMatches.length,
+        matches: limited.matches,
+        total_matched: limited.totalCount,
+        unlocked_count: limited.unlockedCount,
         competitor_watchlist: competitorDomains,
+        plan_meta: {
+          plan_tier: isPremium ? 'premium' : 'free',
+          subscription_status: access.store?.subscription_status || 'inactive',
+          limits: FREE_LIMITS,
+          limit_reached: !isPremium && limited.totalCount > FREE_LIMITS.MAX_FOOTPRINT_MATCHES,
+        },
         db_name: getActiveDbName(),
         is_connected: false,
       });
@@ -897,12 +1124,17 @@ app.get('/api/v1/analytics/footprint', async (req, res) => {
 });
 
 // ============================================================================
-// 3. Merchant Dashboard API (Scoped Strictly to Current Store)
+// 3b. Merchant Visitor Detail API (Scoped Strictly + Server-Side Plan Masking)
 // ============================================================================
-app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
+app.get('/api/v1/analytics/visitor-detail', rateLimitMiddleware, async (req, res) => {
   try {
     const rawTarget = req.query.storeUrl || '';
     const cleanTarget = normalizeUrl(rawTarget);
+    const access = await verifyStoreAccess(req, cleanTarget);
+    if (!access.authorized) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid store API key' });
+    }
+    const isPremium = isStorePremium(access.store);
 
     let companyList = [];
     if (getIsConnected()) {
@@ -957,10 +1189,28 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
         [cleanTarget]
       );
 
+      const limitedCompanies = applyCompanyPlanLimits(companyList, isPremium);
+      const visibleGeneralHits = isPremium ? generalHits : generalHits.slice(0, FREE_LIMITS.MAX_GENERAL_VISITORS);
+
       return res.json({
-        companies: companyList,
-        general_visitors: generalHits,
+        companies: limitedCompanies.companies,
+        general_visitors: visibleGeneralHits,
         total_consumer_visits: generalHits.length,
+        plan_meta: {
+          plan_tier: isPremium ? 'premium' : 'free',
+          subscription_status: access.store?.subscription_status || 'inactive',
+          limits: FREE_LIMITS,
+          usage: {
+            companies_total: limitedCompanies.totalCount,
+            companies_unlocked: limitedCompanies.unlockedCount,
+            general_total: generalHits.length,
+            general_unlocked: visibleGeneralHits.length,
+          },
+          limit_reached: !isPremium && (
+            limitedCompanies.totalCount > FREE_LIMITS.MAX_COMPANIES ||
+            generalHits.length > FREE_LIMITS.MAX_GENERAL_VISITORS
+          ),
+        },
         db_name: getActiveDbName(),
         is_connected: true,
       });
@@ -996,15 +1246,179 @@ app.get('/api/v1/analytics/visitor-detail', async (req, res) => {
       });
     }
 
+    const limitedCompanies = applyCompanyPlanLimits(companyList, isPremium);
     res.json({
-      companies: companyList,
+      companies: limitedCompanies.companies,
       general_visitors: [],
+      plan_meta: {
+        plan_tier: isPremium ? 'premium' : 'free',
+        subscription_status: access.store?.subscription_status || 'inactive',
+        limits: FREE_LIMITS,
+        usage: {
+          companies_total: limitedCompanies.totalCount,
+          companies_unlocked: limitedCompanies.unlockedCount,
+          general_total: 0,
+          general_unlocked: 0,
+        },
+        limit_reached: !isPremium && limitedCompanies.totalCount > FREE_LIMITS.MAX_COMPANIES,
+      },
       db_name: getActiveDbName(),
       is_connected: getIsConnected(),
     });
   } catch (err) {
     console.error('Error in /analytics/visitor-detail:', err);
     res.status(500).json({ error: 'Failed to fetch visitor detail' });
+  }
+});
+
+// ============================================================================
+// 3c. PayPal Subscription & Billing Endpoints (Server-Side Verified)
+// ============================================================================
+app.get('/api/v1/billing/status', rateLimitMiddleware, async (req, res) => {
+  try {
+    const cleanTarget = normalizeUrl(req.query.storeUrl || '');
+    const access = await verifyStoreAccess(req, cleanTarget);
+    if (!access.authorized) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid store API key' });
+    }
+    const store = access.store;
+    const isPremium = isStorePremium(store);
+    const ppCfg = getPayPalConfig();
+
+    res.json({
+      success: true,
+      plan_tier: isPremium ? 'premium' : 'free',
+      subscription_status: store?.subscription_status || 'inactive',
+      paypal_subscription_id: store?.paypal_subscription_id || null,
+      plan_expires_at: store?.plan_expires_at || null,
+      limits: FREE_LIMITS,
+      paypal: {
+        configured: Boolean(ppCfg.clientId && ppCfg.clientSecret && ppCfg.planId),
+        mode: ppCfg.mode,
+        client_id: ppCfg.clientId || null,
+        plan_id: ppCfg.planId || null,
+      },
+    });
+  } catch (err) {
+    console.error('Error in /billing/status:', err);
+    res.status(500).json({ error: 'Failed to load billing status' });
+  }
+});
+
+app.post('/api/v1/billing/paypal/activate', rateLimitMiddleware, async (req, res) => {
+  try {
+    const { storeUrl, subscriptionID } = req.body || {};
+    const cleanTarget = normalizeUrl(storeUrl || '');
+    if (!cleanTarget || !subscriptionID) {
+      return res.status(400).json({ error: 'storeUrl and subscriptionID are required' });
+    }
+
+    const access = await verifyStoreAccess(req, cleanTarget);
+    if (!access.authorized) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid store API key' });
+    }
+
+    // Verify directly with PayPal REST API (never trust client-side claim alone)
+    const { token, cfg } = await getPayPalAccessToken();
+    const ppResp = await httpsJsonRequest({
+      hostname: cfg.host,
+      path: `/v1/billing/subscriptions/${encodeURIComponent(subscriptionID)}`,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (ppResp.status !== 200 || !ppResp.data) {
+      return res.status(400).json({ error: 'Could not verify PayPal subscription ID', details: ppResp.data });
+    }
+
+    const subStatus = (ppResp.data.status || '').toUpperCase();
+    if (subStatus !== 'ACTIVE' && subStatus !== 'APPROVED') {
+      return res.status(400).json({ error: `PayPal subscription is not active (status: ${subStatus})` });
+    }
+
+    if (cfg.planId && ppResp.data.plan_id && ppResp.data.plan_id !== cfg.planId) {
+      return res.status(400).json({ error: 'PayPal plan_id mismatch' });
+    }
+
+    const nextBilling = ppResp.data.billing_info?.next_billing_time
+      ? new Date(ppResp.data.billing_info.next_billing_time)
+      : new Date(Date.now() + 31 * 86400000);
+
+    if (getIsConnected()) {
+      await getPool().query(
+        `UPDATE svt_stores
+         SET plan_tier = 'premium',
+             subscription_status = 'active',
+             paypal_subscription_id = ?,
+             paypal_plan_id = ?,
+             plan_expires_at = ?,
+             updated_at = NOW()
+         WHERE site_url = ?`,
+        [subscriptionID, ppResp.data.plan_id || cfg.planId || '', nextBilling, cleanTarget]
+      );
+    } else if (access.store) {
+      access.store.plan_tier = 'premium';
+      access.store.subscription_status = 'active';
+      access.store.paypal_subscription_id = subscriptionID;
+      access.store.paypal_plan_id = ppResp.data.plan_id || cfg.planId || '';
+      access.store.plan_expires_at = nextBilling.toISOString();
+    }
+
+    res.json({
+      success: true,
+      plan_tier: 'premium',
+      subscription_status: 'active',
+      paypal_subscription_id: subscriptionID,
+      plan_expires_at: nextBilling.toISOString(),
+    });
+  } catch (err) {
+    console.error('Error in /billing/paypal/activate:', err);
+    res.status(500).json({ error: err.message || 'PayPal activation verification failed' });
+  }
+});
+
+// PayPal Webhook Handler (Syncs Renewals, Cancellations & Suspensions)
+app.post('/api/v1/webhooks/paypal', async (req, res) => {
+  try {
+    const event = req.body || {};
+    const eventType = event.event_type || '';
+    const subId = event.resource?.id || event.resource?.billing_agreement_id;
+
+    if (!subId) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    let newTier = null;
+    let newStatus = null;
+
+    if (eventType === 'BILLING.SUBSCRIPTION.ACTIVATED' || eventType === 'PAYMENT.SALE.COMPLETED') {
+      newTier = 'premium';
+      newStatus = 'active';
+    } else if (
+      eventType === 'BILLING.SUBSCRIPTION.CANCELLED' ||
+      eventType === 'BILLING.SUBSCRIPTION.SUSPENDED' ||
+      eventType === 'BILLING.SUBSCRIPTION.EXPIRED'
+    ) {
+      newTier = 'free';
+      newStatus = eventType.split('.').pop().toLowerCase();
+    }
+
+    if (newTier && getIsConnected()) {
+      await getPool().query(
+        `UPDATE svt_stores
+         SET plan_tier = ?, subscription_status = ?, updated_at = NOW()
+         WHERE paypal_subscription_id = ?`,
+        [newTier, newStatus, subId]
+      );
+    }
+
+    res.status(200).json({ received: true, event_type: eventType });
+  } catch (err) {
+    console.error('Error in /webhooks/paypal:', err);
+    res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
 

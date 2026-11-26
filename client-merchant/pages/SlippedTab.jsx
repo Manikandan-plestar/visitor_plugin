@@ -13,6 +13,7 @@ import {
   Share2,
   X,
   SlidersHorizontal,
+  Lock,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation, maskIpAddress } from './TrafficTab';
 
@@ -33,6 +34,8 @@ export default function SlippedTab({
   slippedEnabled = true,
   slippedWindow = '48h',
   onNavigateTab,
+  planMeta = {},
+  onOpenUpgrade,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
@@ -458,6 +461,7 @@ export default function SlippedTab({
                 </tr>
               ) : (
                 filteredRecords.map((r, idx) => {
+                  const isLockedRow = planMeta?.plan_tier !== 'premium' && idx >= 3;
                   const DeviceIcon =
                     r.deviceType === 'Mobile' ? Smartphone : r.deviceType === 'Tablet' ? Laptop : Monitor;
 
@@ -480,11 +484,24 @@ export default function SlippedTab({
                           </div>
                           <div className="min-w-0">
                             <span className="font-bold text-slate-900 truncate block max-w-[200px]">
-                              {r.companyName || maskIpAddress(r.ip)}
+                              {r.companyName || (isLockedRow ? '•••.•••.•••.•••' : maskIpAddress(r.ip))}
                             </span>
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 truncate">
-                              <span className="text-xs">{r.countryFlag}</span>
-                              <span className="truncate">{r.location}</span>
+                              {isLockedRow ? (
+                                <button
+                                  type="button"
+                                  onClick={onOpenUpgrade}
+                                  className="inline-flex items-center gap-1 text-amber-700 font-semibold hover:underline cursor-pointer"
+                                >
+                                  <Lock className="w-3 h-3" />
+                                  <span>Unlock IP & Contact</span>
+                                </button>
+                              ) : (
+                                <>
+                                  <span className="text-xs">{r.countryFlag}</span>
+                                  <span className="truncate">{r.location}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

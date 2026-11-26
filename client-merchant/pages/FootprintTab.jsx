@@ -21,6 +21,8 @@ import {
   SlidersHorizontal,
   X,
   Target,
+  Lock,
+  Crown,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation, maskIpAddress } from './TrafficTab';
 
@@ -108,6 +110,8 @@ export default function FootprintTab({
   allHits = [],
   competitorUrls = '',
   wpSettings = {},
+  planMeta = {},
+  onOpenUpgrade,
   onSaveCompetitors,
   onNavigateTab,
 }) {
@@ -131,14 +135,22 @@ export default function FootprintTab({
   const [liveFootprints, setLiveFootprints] = useState([]);
   const [loadingFootprints, setLoadingFootprints] = useState(false);
 
+  const isPremium = planMeta?.plan_tier === 'premium';
+  const [watchlistLimitMsg, setWatchlistLimitMsg] = useState(false);
+
   // Fetch Live Cross-Store hits from Central Backend
   const fetchLiveFootprints = async () => {
     if (!wpSettings.apiUrl || !wpSettings.storeUrl) return;
     setLoadingFootprints(true);
     try {
+      const headers = {};
+      if (wpSettings.storeApiKey) {
+        headers['x-store-key'] = wpSettings.storeApiKey;
+      }
       const compParam = competitorList.join(',');
       const res = await fetch(
-        `${wpSettings.apiUrl}/api/v1/analytics/footprint?storeUrl=${encodeURIComponent(wpSettings.storeUrl)}&competitors=${encodeURIComponent(compParam)}`
+        `${wpSettings.apiUrl.replace(/\/+$/, '')}/api/v1/analytics/footprint?storeUrl=${encodeURIComponent(wpSettings.storeUrl)}&competitors=${encodeURIComponent(compParam)}`,
+        { headers }
       );
       const data = await res.json();
       if (data.success && Array.isArray(data.matches)) {
@@ -160,6 +172,13 @@ export default function FootprintTab({
     e.preventDefault();
     const clean = watchlistInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     if (!clean || competitorList.includes(clean)) return;
+
+    if (!isPremium && competitorList.length >= 1) {
+      setWatchlistLimitMsg(true);
+      if (onOpenUpgrade) onOpenUpgrade();
+      return;
+    }
+    setWatchlistLimitMsg(false);
 
     const updated = [...competitorList, clean];
     setCompetitorList(updated);
@@ -204,6 +223,7 @@ export default function FootprintTab({
       list.push({
         id: `live_fp_${hit.id}`,
         is_demo: false,
+        is_locked: Boolean(hit.is_locked),
         visitor_ip: hit.visitor_ip,
         company_name: matchingCompany?.company_name || hit.identified_company || 'B2B Enterprise',
         industry: matchingCompany?.industry || hit.industry || 'Commercial Enterprise',
@@ -615,18 +635,29 @@ export default function FootprintTab({
 
                     {/* Market Intent Badge */}
                     <td className="py-3 px-4 text-right whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                          item.cross_shop_intent === 'High Intent'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : item.cross_shop_intent === 'Active Comparison'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        }`}
-                      >
-                        <TrendingUp className="w-3 h-3" />
-                        <span>{item.cross_shop_intent}</span>
-                      </span>
+                      {item.is_locked ? (
+                        <button
+                          type="button"
+                          onClick={onOpenUpgrade}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 cursor-pointer"
+                        >
+                          <Lock className="w-3 h-3" />
+                          <span>Unlock</span>
+                        </button>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                            item.cross_shop_intent === 'High Intent'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : item.cross_shop_intent === 'Active Comparison'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                        >
+                          <TrendingUp className="w-3 h-3" />
+                          <span>{item.cross_shop_intent}</span>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

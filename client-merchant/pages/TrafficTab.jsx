@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   X,
+  Lock,
 } from 'lucide-react';
 
 /**
@@ -245,6 +246,8 @@ export default function TrafficTab({
   allHits = [],
   onSelectCompany,
   onNavigateTab,
+  planMeta = {},
+  onOpenUpgrade,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'NEW' | 'RETURNING' | 'CORPORATE' | 'CONSUMER'
@@ -725,22 +728,38 @@ export default function TrafficTab({
             </div>
 
             {/* Date Filter: From - To */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-700 shadow-2xs shrink-0">
-              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div
+              onClick={() => {
+                if (planMeta?.plan_tier !== 'premium' && onOpenUpgrade) {
+                  onOpenUpgrade();
+                }
+              }}
+              title={planMeta?.plan_tier !== 'premium' ? 'Upgrade to Premium to use custom date filtering' : 'Filter by date range'}
+              className={`flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-700 shadow-2xs shrink-0 ${
+                planMeta?.plan_tier !== 'premium' ? 'cursor-pointer opacity-80 hover:border-amber-300' : ''
+              }`}
+            >
+              {planMeta?.plan_tier !== 'premium' ? (
+                <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              ) : (
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              )}
               <span className="text-slate-500 font-medium text-[11px]">From:</span>
               <input
                 type="date"
                 value={fromDate}
+                disabled={planMeta?.plan_tier !== 'premium'}
                 onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer w-[105px]"
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer w-[105px] disabled:cursor-pointer"
                 aria-label="Filter from date"
               />
               <span className="text-slate-400 font-medium text-[11px] ml-0.5">To:</span>
               <input
                 type="date"
                 value={toDate}
+                disabled={planMeta?.plan_tier !== 'premium'}
                 onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
-                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer w-[105px]"
+                className="bg-transparent border-none text-xs text-slate-800 focus:outline-none p-0 cursor-pointer w-[105px] disabled:cursor-pointer"
                 aria-label="Filter to date"
               />
               {(fromDate || toDate) && (
@@ -831,12 +850,19 @@ export default function TrafficTab({
               ) : (
                 paginatedTraffic.map((row, idx) => {
                   const sNo = (currentPage - 1) * pageSize + idx + 1;
+                  const isLockedRow = planMeta?.plan_tier !== 'premium' && sNo > 15;
                   return (
                     <tr
                       key={row.ip}
-                      onClick={() => setSelectedIp(row.ip)}
+                      onClick={() => {
+                        if (isLockedRow) {
+                          if (onOpenUpgrade) onOpenUpgrade();
+                          return;
+                        }
+                        setSelectedIp(row.ip);
+                      }}
                       className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
-                      title="Click row to view individual IP details"
+                      title={isLockedRow ? 'Upgrade to Premium to view older visitor rows' : 'Click row to view individual IP details'}
                     >
                       {/* S.No */}
                       <td className="py-2.5 px-2 text-center font-mono text-slate-400 font-semibold whitespace-nowrap">
@@ -845,12 +871,19 @@ export default function TrafficTab({
 
                       {/* IP Address (Masked with first 6 digits / 2 octets, remaining hidden) */}
                       <td className="py-2.5 px-2 text-left whitespace-nowrap">
-                        <span
-                          className="font-mono font-bold text-slate-800 hover:text-blue-600 transition-colors text-xs"
-                          title="Click row to inspect details"
-                        >
-                          {maskIpAddress(row.ip)}
-                        </span>
+                        {isLockedRow ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                            <Lock className="w-3 h-3" />
+                            <span>Upgrade to Reveal</span>
+                          </span>
+                        ) : (
+                          <span
+                            className="font-mono font-bold text-slate-800 hover:text-blue-600 transition-colors text-xs"
+                            title="Click row to inspect details"
+                          >
+                            {maskIpAddress(row.ip)}
+                          </span>
+                        )}
                       </td>
 
                       {/* Location: Flag + City / Country */}

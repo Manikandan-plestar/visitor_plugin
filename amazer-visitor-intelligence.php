@@ -375,6 +375,38 @@ function amazer_via_register_admin_dashboard_menu() {
 add_action( 'admin_menu', 'amazer_via_register_admin_dashboard_menu' );
 
 /**
+ * Ensure this storefront is registered with the Central Backend and holds its unique store_api_key.
+ */
+function amazer_via_get_store_api_key() {
+    $key = get_option( 'amazer_via_store_api_key', '' );
+    if ( ! empty( $key ) ) {
+        return $key;
+    }
+
+    $activate_url = trailingslashit( amazer_via_get_api_url() ) . 'api/v1/store/activate';
+    $response     = wp_remote_post( $activate_url, array(
+        'method'  => 'POST',
+        'timeout' => 8,
+        'headers' => array( 'Content-Type' => 'application/json' ),
+        'body'    => wp_json_encode( array(
+            'site_url'  => esc_url_raw( get_site_url() ),
+            'site_name' => get_bloginfo( 'name' ),
+        ) ),
+    ) );
+
+    if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        if ( ! empty( $body['store_api_key'] ) ) {
+            $key = sanitize_text_field( $body['store_api_key'] );
+            update_option( 'amazer_via_store_api_key', $key, false );
+            return $key;
+        }
+    }
+
+    return '';
+}
+
+/**
  * Enqueue Dashboard Assets on plugin page
  */
 function amazer_via_enqueue_admin_assets( $hook_suffix ) {
@@ -441,6 +473,7 @@ function amazer_via_enqueue_admin_assets( $hook_suffix ) {
             'slippedEnabled'      => get_option( 'amazer_via_slipped_enabled', 'yes' ),
             'slippedWindow'       => get_option( 'amazer_via_slipped_window', '48h' ),
             'competitorUrls'      => get_option( 'amazer_via_competitor_urls', '' ),
+            'storeApiKey'         => amazer_via_get_store_api_key(),
         ) );
     }
 }

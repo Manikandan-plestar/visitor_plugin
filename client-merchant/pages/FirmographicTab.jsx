@@ -16,6 +16,7 @@ import {
   Monitor,
   Calendar,
   X,
+  Lock,
 } from 'lucide-react';
 
 /**
@@ -46,6 +47,8 @@ export default function FirmographicTab({
   selectedCompanyId,
   onSelectCompany,
   onDeleteDemoCompany,
+  planMeta = {},
+  onOpenUpgrade,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -537,17 +540,32 @@ export default function FirmographicTab({
 
                       {/* Action Icon */}
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectCompany(c.id);
-                          }}
-                          title={`View ${c.company_name} details`}
-                          className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white transition-all inline-flex items-center justify-center cursor-pointer shadow-2xs"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        {c.is_locked && onOpenUpgrade ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenUpgrade();
+                            }}
+                            title="Upgrade to Premium to unlock full company contact details"
+                            className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition-all inline-flex items-center justify-center gap-1 cursor-pointer text-[11px] font-bold"
+                          >
+                            <Lock className="w-3 h-3" />
+                            <span>Unlock</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectCompany(c.id);
+                            }}
+                            title={`View ${c.company_name} details`}
+                            className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white transition-all inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

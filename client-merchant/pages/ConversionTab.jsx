@@ -23,6 +23,7 @@ import {
   User,
   Info,
   X,
+  Lock,
 } from 'lucide-react';
 import { parseTrafficSource, getIpLocation, maskIpAddress } from './TrafficTab';
 
@@ -34,6 +35,8 @@ export default function ConversionTab({
   onNavigateTab,
   onSelectCompany,
   onSaveConversionUrls,
+  planMeta = {},
+  onOpenUpgrade,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedIp, setCopiedIp] = useState(null);
@@ -620,6 +623,7 @@ export default function ConversionTab({
               ) : (
                 paginatedVisitors.map((row, idx) => {
                   const sNo = (currentPage - 1) * pageSize + idx + 1;
+                  const isLockedRow = planMeta?.plan_tier !== 'premium' && sNo > 5;
                   return (
                     <tr key={row.ip} className="hover:bg-rose-50/30 transition-colors">
                       {/* 1. S.No */}
@@ -629,16 +633,29 @@ export default function ConversionTab({
 
                       {/* 2. IP Address */}
                       <td className="py-3.5 px-4 text-left whitespace-nowrap">
-                        <span className="font-mono font-bold text-slate-900">{maskIpAddress(row.ip)}</span>
-                        {row.isCorporate && (
-                          <span className="text-[10px] text-slate-500 block truncate max-w-[150px]">
-                            {row.companyName}
-                          </span>
-                        )}
-                        {row.events && row.events[0]?.pageUrl && (
-                          <span className="font-mono text-[10px] text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/60 block truncate max-w-[170px] mt-0.5">
-                            {row.events[0].pageUrl}
-                          </span>
+                        {isLockedRow ? (
+                          <button
+                            type="button"
+                            onClick={onOpenUpgrade}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 text-[11px] font-bold cursor-pointer"
+                          >
+                            <Lock className="w-3 h-3" />
+                            <span>Upgrade to Reveal</span>
+                          </button>
+                        ) : (
+                          <>
+                            <span className="font-mono font-bold text-slate-900">{maskIpAddress(row.ip)}</span>
+                            {row.isCorporate && (
+                              <span className="text-[10px] text-slate-500 block truncate max-w-[150px]">
+                                {row.companyName}
+                              </span>
+                            )}
+                            {row.events && row.events[0]?.pageUrl && (
+                              <span className="font-mono text-[10px] text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/60 block truncate max-w-[170px] mt-0.5">
+                                {row.events[0].pageUrl}
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
 
