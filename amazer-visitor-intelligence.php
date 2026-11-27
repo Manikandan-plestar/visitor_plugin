@@ -42,21 +42,8 @@ function amazer_via_get_api_url() {
         return untrailingslashit( esc_url_raw( SVT_CENTRAL_API_URL ) );
     }
 
-    // 2. Single Master Switch from config.php: 'local' => 4000, 'live' => 3011
-    if ( defined( 'AMAZER_ENVIRONMENT' ) ) {
-        if ( strtolower( AMAZER_ENVIRONMENT ) === 'live' ) {
-            return defined( 'AMAZER_LIVE_API_URL' ) ? AMAZER_LIVE_API_URL : 'https://apps.plestarinc.com:3011';
-        }
-        return defined( 'AMAZER_LOCAL_API_URL' ) ? AMAZER_LOCAL_API_URL : 'http://localhost:4000';
-    }
-
-    // 3. Fallback based on host
-    $host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '';
-    if ( strpos( $host, 'localhost' ) !== false || strpos( $host, '127.0.0.1' ) !== false ) {
-        return 'http://localhost:4000';
-    }
-
-    return 'https://apps.plestarinc.com:3011';
+    // 2. Live Production Cloud API
+    return defined( 'AMAZER_LIVE_API_URL' ) ? untrailingslashit( AMAZER_LIVE_API_URL ) : 'https://apps.plestarinc.com:3011';
 }
 
 /**

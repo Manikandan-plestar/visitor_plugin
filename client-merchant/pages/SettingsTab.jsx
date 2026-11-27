@@ -3,7 +3,6 @@ import {
   Zap,
   Target,
   ShoppingBag,
-  Server,
   ShieldCheck,
   Check,
   Save,
@@ -49,15 +48,9 @@ export default function SettingsTab({
   const [slpSaved, setSlpSaved] = useState(false);
   const [slpSaving, setSlpSaving] = useState(false);
 
-  const [apiUrl, setApiUrl] = useState(wpSettings.apiUrl || 'http://localhost:4000');
-  const [apiSaved, setApiSaved] = useState(false);
-  const [apiSaving, setApiSaving] = useState(false);
-
   const [urlLimitWarning, setUrlLimitWarning] = useState('');
 
   const isPremium = planMeta?.plan_tier === 'premium';
-  const isLocalApi =
-    apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes('4000');
 
   const handleSaveAnalytics = async (e) => {
     e.preventDefault();
@@ -106,23 +99,6 @@ export default function SettingsTab({
       console.error(err);
     } finally {
       setSlpSaving(false);
-    }
-  };
-
-  const handleSaveApi = async (e) => {
-    e.preventDefault();
-    setApiSaving(true);
-    setApiSaved(false);
-    try {
-      if (onSaveApiEndpoint) {
-        await onSaveApiEndpoint(apiUrl);
-      }
-      setApiSaved(true);
-      setTimeout(() => setApiSaved(false), 3000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setApiSaving(false);
     }
   };
 
@@ -424,77 +400,8 @@ export default function SettingsTab({
           </div>
         </div>
 
-        {/* Card 3: Backend API Endpoint */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <span className="p-2 bg-slate-100 text-slate-700 rounded-xl">
-                  <Server className="w-4 h-4" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Central Intelligence Backend Endpoint
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Master switch configured in <code>config.php</code>.
-                  </p>
-                </div>
-              </div>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                  isLocalApi
-                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                }`}
-              >
-                {isLocalApi ? 'LOCAL DEV (4000)' : 'LIVE CLOUD (3011)'}
-              </span>
-            </div>
-
-            <form id="amazer-api-form" onSubmit={handleSaveApi} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Backend API URL
-                </label>
-                <input
-                  type="url"
-                  value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
-                  placeholder="https://apps.plestarinc.com:3011 or http://localhost:4000"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
-                  required
-                />
-              </div>
-            </form>
-          </div>
-
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-            {apiSaved ? (
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                <Check className="w-4 h-4" /> Endpoint updated!
-              </span>
-            ) : (
-              <span className="text-[11px] text-slate-400">Saved to WordPress options</span>
-            )}
-            <button
-              type="submit"
-              form="amazer-api-form"
-              disabled={apiSaving}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              {apiSaving ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              {apiSaving ? 'Saving...' : 'Update Endpoint'}
-            </button>
-          </div>
-        </div>
-
-        {/* Card 4: Privacy, Consent & Legal */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
+        {/* Card 3: Privacy, Consent & Legal */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs flex flex-col justify-between space-y-4 xl:col-span-2">
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">

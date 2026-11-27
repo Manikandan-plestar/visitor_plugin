@@ -225,9 +225,9 @@ const DEFAULT_DEMO_GENERAL_VISITORS = [
 
 export default function MerchantDashboard() {
   const wpSettings = window.amazerViSettings || window.amazerWhoisSettings || window.svtSettings || {
-    storeUrl: 'http://localhost/wordpress_practice',
-    apiUrl: 'http://localhost:4000',
-    environment: 'local',
+    storeUrl: typeof window !== 'undefined' ? window.location.origin : '',
+    apiUrl: 'https://apps.plestarinc.com:3011',
+    environment: 'live',
     siteName: 'My Storefront',
     ajaxUrl: '/wp-admin/admin-ajax.php',
     nonce: '',
