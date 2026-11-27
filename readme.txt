@@ -2,7 +2,7 @@
 Contributors: amazerinc, amazerplugins
 Tags: amazer analytics, visitor intelligence, whois analytics, visitor tracking, b2b intelligence
 Requires at least: 5.8
-Tested up to: 6.7
+Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPL-2.0-or-later
@@ -38,10 +38,10 @@ This plugin relies on the following external SaaS services:
 == Source Code & Build Instructions ==
 
 The human-readable source code for the minified frontend bundle (dist/bundle.js) is publicly maintained and available in the following repository:
-* Repository URL: https://github.com/Manikandan-plestar/visitor_plugin
+* Repository URL: https://github.com/amazer-inc/Amazer-Visitor-Intelligence
 
 To build or compile the JavaScript bundle from source:
-1. Clone the repository: `git clone https://github.com/Manikandan-plestar/visitor_plugin.git`
+1. Clone the repository: `git clone https://github.com/amazer-inc/Amazer-Visitor-Intelligence.git`
 2. Change into the plugin directory and install dependencies:
    `npm install`
 3. Compile the production bundle:
