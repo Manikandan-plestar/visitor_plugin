@@ -815,6 +815,9 @@ export default function MerchantDashboard() {
             allHits={allHits}
             slippedEnabled={slippedEnabled}
             slippedWindow={slippedWindow}
+            competitorUrls={competitorUrls}
+            conversionUrls={conversionUrls}
+            wpSettings={wpSettings}
             onNavigateTab={(tab) => handleTabSwitch(tab)}
             planMeta={planMeta}
             onOpenUpgrade={() => setShowUpgradeModal(true)}

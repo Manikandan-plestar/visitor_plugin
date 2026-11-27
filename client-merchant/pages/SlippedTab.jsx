@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShoppingBag,
   TrendingDown,
@@ -33,6 +33,9 @@ export default function SlippedTab({
   allHits = [],
   slippedEnabled = true,
   slippedWindow = '48h',
+  competitorUrls = '',
+  conversionUrls = '',
+  wpSettings = {},
   onNavigateTab,
   planMeta = {},
   onOpenUpgrade,
@@ -41,9 +44,85 @@ export default function SlippedTab({
   const [dateFilter, setDateFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [liveSlipped, setLiveSlipped] = useState([]);
 
-  // Build raw slipped records from storefront visitors
+  useEffect(() => {
+    if (!slippedEnabled || !wpSettings.apiUrl || !wpSettings.storeUrl) {
+      setLiveSlipped([]);
+      return;
+    }
+    const compStr = competitorUrls || wpSettings.competitorUrls || '';
+    if (!compStr.trim()) {
+      setLiveSlipped([]);
+      return;
+    }
+
+    const fetchSlipped = async () => {
+      try {
+        const headers = {};
+        if (wpSettings.storeApiKey) {
+          headers['x-store-key'] = wpSettings.storeApiKey;
+        }
+        const url = `${wpSettings.apiUrl.replace(/\/+$/, '')}/api/v1/analytics/slipped?storeUrl=${encodeURIComponent(
+          wpSettings.storeUrl
+        )}&competitors=${encodeURIComponent(compStr)}&window=${encodeURIComponent(
+          slippedWindow || '48h'
+        )}&conversionUrls=${encodeURIComponent(conversionUrls || wpSettings.conversionUrls || '')}`;
+        const res = await fetch(url, { headers });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.slipped)) {
+          setLiveSlipped(data.slipped);
+        }
+      } catch (e) {
+        console.warn('Slipped live fetch error:', e);
+      }
+    };
+
+    fetchSlipped();
+  }, [slippedEnabled, slippedWindow, competitorUrls, conversionUrls, wpSettings.apiUrl, wpSettings.storeUrl]);
+
+  // Build raw slipped records: prioritize live competitor-conversion matches (IP-masked only, zero company details)
   const rawSlippedRecords = useMemo(() => {
+    if (!slippedEnabled) return [];
+
+    if (liveSlipped.length > 0) {
+      return liveSlipped.map((item, idx) => {
+        const src = parseTrafficSource(item.referrer, null);
+        const loc = getIpLocation({ visitor_ip: item.visitor_ip });
+        const browser = item.browser || 'Chrome';
+        const isMobile = browser.toLowerCase().includes('mobile');
+        const isTablet = browser.toLowerCase().includes('tablet');
+        const deviceType = isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop';
+        const slippedTimestamp = new Date(item.slipped_at).getTime();
+
+        return {
+          id: `slp_live_${item.id || idx}`,
+          isCorporate: false,
+          companyName: null, // Privacy: never expose competitor or company details in Slipped
+          isLockedServer: Boolean(item.is_locked),
+          ip: item.visitor_ip || '•••.•••.•••.•••',
+          location: loc.country ? `${loc.city ? loc.city + ', ' : ''}${loc.country}` : 'Network Visitor',
+          countryFlag: loc.flag || '🌐',
+          sourceLabel: src.label || 'Direct Navigation',
+          sourceBadgeClass: src.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200',
+          deviceType,
+          browser,
+          lastPage: item.last_page || '/',
+          dwellFormatted: formatDwellTime(item.dwell_seconds),
+          slippedTimestamp,
+          slippedDateStr: new Date(slippedTimestamp).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          slippedTimeStr: new Date(slippedTimestamp).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        };
+      });
+    }
+
     const list = [];
     const now = Date.now();
 
@@ -86,8 +165,8 @@ export default function SlippedTab({
 
       list.push({
         id: `slp_corp_${c.id || idx}`,
-        isCorporate: true,
-        companyName: c.company_name || 'B2B Enterprise',
+        isCorporate: false,
+        companyName: null, // Privacy: Slipped shows masked IP only, no company details
         ip: c.activation_ip || lastVisit.visitor_ip || '194.138.37.10',
         industry: c.industry || 'B2B Commercial Enterprise',
         location: loc.country ? `${loc.city ? loc.city + ', ' : ''}${loc.country}` : 'Global Network',
@@ -155,7 +234,7 @@ export default function SlippedTab({
 
     // Sort by slipped timestamp descending (most recent first)
     return list.sort((a, b) => b.slippedTimestamp - a.slippedTimestamp);
-  }, [companies, generalVisitors]);
+  }, [companies, generalVisitors, liveSlipped, slippedEnabled]);
 
   // Apply Search and Date Filters
   const filteredRecords = useMemo(() => {
@@ -461,7 +540,7 @@ export default function SlippedTab({
                 </tr>
               ) : (
                 filteredRecords.map((r, idx) => {
-                  const isLockedRow = planMeta?.plan_tier !== 'premium' && idx >= 3;
+                  const isLockedRow = r.isLockedServer || (planMeta?.plan_tier !== 'premium' && idx >= 3);
                   const DeviceIcon =
                     r.deviceType === 'Mobile' ? Smartphone : r.deviceType === 'Tablet' ? Laptop : Monitor;
 

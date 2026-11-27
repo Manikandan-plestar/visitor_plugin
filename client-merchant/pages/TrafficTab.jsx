@@ -532,33 +532,6 @@ export default function TrafficTab({
 
     return (
       <div className="space-y-6">
-        {/* Back Navigation Bar */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => setSelectedIp(null)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer group w-fit"
-          >
-            <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
-            <span>Back to Visitor Traffic Log</span>
-          </button>
-
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500">Visitor Classification:</span>
-            {selectedIpRecord.isCorporate ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Identified B2B Entity</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                <User className="w-3.5 h-3.5 text-slate-500" />
-                <span>General Visitor (ISP / Consumer)</span>
-              </span>
-            )}
-          </div>
-        </div>
-
         {/* IP Profile Hero Card */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-6 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-slate-100 gap-4">
@@ -581,7 +554,15 @@ export default function TrafficTab({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIp(null)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs cursor-pointer group w-fit"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
+                <span>Back to Visitor Traffic Log</span>
+              </button>
               {selectedIpRecord.isReturning ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                   <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />

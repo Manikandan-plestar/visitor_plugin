@@ -157,6 +157,7 @@ function getPayPalConfig() {
     clientId: (process.env.PAYPAL_CLIENT_ID || '').trim(),
     clientSecret: (process.env.PAYPAL_CLIENT_SECRET || '').trim(),
     planId: (process.env.PAYPAL_PREMIUM_PLAN_ID || '').trim(),
+    webhookId: (process.env.PAYPAL_WEBHOOK_ID || '').trim(),
   };
 }
 
@@ -1124,6 +1125,190 @@ app.get('/api/v1/analytics/footprint', rateLimitMiddleware, async (req, res) => 
 });
 
 // ============================================================================
+// 3a. Slipped Prospects API (Competitor Conversion Detection — IP Masked Only)
+// ============================================================================
+function parseAttributionWindowMs(winStr) {
+  const w = (winStr || '48h').toLowerCase().trim();
+  if (w === '24h') return 24 * 3600000;
+  if (w === '7d') return 7 * 86400000;
+  if (w === '14d') return 14 * 86400000;
+  return 48 * 3600000; // default 48h
+}
+
+app.get('/api/v1/analytics/slipped', rateLimitMiddleware, async (req, res) => {
+  try {
+    const rawTarget = req.query.storeUrl || '';
+    const cleanTarget = normalizeUrl(rawTarget);
+    const access = await verifyStoreAccess(req, cleanTarget);
+    if (!access.authorized) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid store API key' });
+    }
+    const isPremium = isStorePremium(access.store);
+    const windowMs = parseAttributionWindowMs(req.query.window);
+
+    let competitorDomains = (req.query.competitors || '')
+      .split(',')
+      .map((c) => c.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+      .filter(Boolean);
+
+    if (!isPremium && competitorDomains.length > FREE_LIMITS.MAX_COMPETITOR_DOMAINS) {
+      competitorDomains = competitorDomains.slice(0, FREE_LIMITS.MAX_COMPETITOR_DOMAINS);
+    }
+
+    const convPatterns = (
+      req.query.conversionUrls ||
+      '/thank-you, /order-received, /order-confirmed, /checkout/success, /checkout'
+    )
+      .split(',')
+      .map((u) => u.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (competitorDomains.length === 0) {
+      return res.json({
+        success: true,
+        slipped: [],
+        total_slipped: 0,
+        plan_meta: {
+          plan_tier: isPremium ? 'premium' : 'free',
+          subscription_status: access.store?.subscription_status || 'inactive',
+          limits: FREE_LIMITS,
+        },
+      });
+    }
+
+    const isConversionPage = (pageUrl) => {
+      const p = (pageUrl || '').toLowerCase();
+      return convPatterns.some((pat) => p.includes(pat));
+    };
+
+    const matchesCompetitor = (targetStore) => {
+      const domain = (targetStore || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      return competitorDomains.some((d) => domain.includes(d));
+    };
+
+    let slippedList = [];
+
+    if (getIsConnected()) {
+      const pool = getPool();
+      const [ourHits] = await pool.query(
+        `SELECT visitor_ip, page_url, referrer, browser, duration_seconds, visited_at
+         FROM svt_visitor_hits
+         WHERE target_store = ?
+         ORDER BY visited_at DESC
+         LIMIT 500`,
+        [cleanTarget]
+      );
+
+      // Keep latest hit per IP on Merchant A's store
+      const ourIpMap = new Map();
+      for (const h of ourHits) {
+        if (h.visitor_ip && !ourIpMap.has(h.visitor_ip)) {
+          ourIpMap.set(h.visitor_ip, h);
+        }
+      }
+
+      const targetIps = Array.from(ourIpMap.keys());
+      if (targetIps.length > 0) {
+        const placeholders = targetIps.map(() => '?').join(',');
+        const [otherHits] = await pool.query(
+          `SELECT id, target_store, visitor_ip, page_url, visited_at
+           FROM svt_visitor_hits
+           WHERE target_store != ?
+             AND visitor_ip IN (${placeholders})
+           ORDER BY visited_at DESC
+           LIMIT 500`,
+          [cleanTarget, ...targetIps]
+        );
+
+        const seenIps = new Set();
+        for (const ch of otherHits) {
+          if (seenIps.has(ch.visitor_ip)) continue;
+          if (!matchesCompetitor(ch.target_store) || !isConversionPage(ch.page_url)) continue;
+
+          const ourHit = ourIpMap.get(ch.visitor_ip);
+          const ourTime = new Date(ourHit.visited_at).getTime();
+          const compTime = new Date(ch.visited_at).getTime();
+          if (compTime >= ourTime && compTime - ourTime <= windowMs) {
+            seenIps.add(ch.visitor_ip);
+            slippedList.push({
+              id: ch.id,
+              visitor_ip: ch.visitor_ip,
+              last_page: ourHit.page_url || '/',
+              referrer: ourHit.referrer || 'Direct Navigation',
+              browser: ourHit.browser || 'Chrome',
+              dwell_seconds: ourHit.duration_seconds || 60,
+              our_visited_at: ourHit.visited_at,
+              slipped_at: ch.visited_at,
+            });
+          }
+        }
+      }
+    } else {
+      // In-Memory Fallback
+      const ourHits = memoryDb.hits
+        .filter((h) => !cleanTarget || h.target_store === cleanTarget)
+        .sort((a, b) => new Date(b.visited_at) - new Date(a.visited_at));
+
+      const ourIpMap = new Map();
+      for (const h of ourHits) {
+        if (h.visitor_ip && !ourIpMap.has(h.visitor_ip)) {
+          ourIpMap.set(h.visitor_ip, h);
+        }
+      }
+
+      const seenIps = new Set();
+      for (const ch of memoryDb.hits) {
+        if (ch.target_store === cleanTarget || !ourIpMap.has(ch.visitor_ip) || seenIps.has(ch.visitor_ip)) continue;
+        if (!matchesCompetitor(ch.target_store) || !isConversionPage(ch.page_url)) continue;
+
+        const ourHit = ourIpMap.get(ch.visitor_ip);
+        const ourTime = new Date(ourHit.visited_at).getTime();
+        const compTime = new Date(ch.visited_at).getTime();
+        if (compTime >= ourTime && compTime - ourTime <= windowMs) {
+          seenIps.add(ch.visitor_ip);
+          slippedList.push({
+            id: ch.id,
+            visitor_ip: ch.visitor_ip,
+            last_page: ourHit.page_url || '/',
+            referrer: ourHit.referrer || 'Direct Navigation',
+            browser: ourHit.browser || 'Chrome',
+            dwell_seconds: ourHit.duration_seconds || 60,
+            our_visited_at: ourHit.visited_at,
+            slipped_at: ch.visited_at,
+          });
+        }
+      }
+    }
+
+    // Privacy + Plan Gating: Never return competitor store/company; mask IP beyond Free limit (3)
+    const gatedSlipped = slippedList.map((item, idx) => {
+      const locked = !isPremium && idx >= 3;
+      return {
+        ...item,
+        is_locked: locked,
+        visitor_ip: locked ? '•••.•••.•••.•••' : item.visitor_ip,
+      };
+    });
+
+    res.json({
+      success: true,
+      slipped: gatedSlipped,
+      total_slipped: gatedSlipped.length,
+      plan_meta: {
+        plan_tier: isPremium ? 'premium' : 'free',
+        subscription_status: access.store?.subscription_status || 'inactive',
+        limits: FREE_LIMITS,
+      },
+      db_name: getActiveDbName(),
+      is_connected: getIsConnected(),
+    });
+  } catch (err) {
+    console.error('Error in /api/v1/analytics/slipped:', err);
+    res.status(500).json({ error: 'Failed to fetch slipped prospects', details: err.message });
+  }
+});
+
+// ============================================================================
 // 3b. Merchant Visitor Detail API (Scoped Strictly + Server-Side Plan Masking)
 // ============================================================================
 app.get('/api/v1/analytics/visitor-detail', rateLimitMiddleware, async (req, res) => {
@@ -1380,9 +1565,69 @@ app.post('/api/v1/billing/paypal/activate', rateLimitMiddleware, async (req, res
   }
 });
 
+async function verifyPayPalWebhookSignature(req) {
+  const { token, cfg } = await getPayPalAccessToken();
+  if (!cfg.webhookId) {
+    return { verified: false, reason: 'PAYPAL_WEBHOOK_ID is not configured' };
+  }
+
+  const authAlgo = req.headers['paypal-auth-algo'];
+  const certUrl = req.headers['paypal-cert-url'];
+  const transmissionId = req.headers['paypal-transmission-id'];
+  const transmissionSig = req.headers['paypal-transmission-sig'];
+  const transmissionTime = req.headers['paypal-transmission-time'];
+
+  if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) {
+    return { verified: false, reason: 'Missing PayPal webhook signature headers' };
+  }
+
+  const payloadStr = JSON.stringify({
+    auth_algo: authAlgo,
+    cert_url: certUrl,
+    transmission_id: transmissionId,
+    transmission_sig: transmissionSig,
+    transmission_time: transmissionTime,
+    webhook_id: cfg.webhookId,
+    webhook_event: req.body,
+  });
+
+  const resp = await httpsJsonRequest(
+    {
+      hostname: cfg.host,
+      path: '/v1/notifications/verify-webhook-signature',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payloadStr),
+      },
+    },
+    payloadStr
+  );
+
+  const verified = resp.status === 200 && resp.data?.verification_status === 'SUCCESS';
+  return {
+    verified,
+    reason: verified ? null : `PayPal signature check returned ${resp.data?.verification_status || resp.status}`,
+  };
+}
+
 // PayPal Webhook Handler (Syncs Renewals, Cancellations & Suspensions)
 app.post('/api/v1/webhooks/paypal', async (req, res) => {
   try {
+    const ppCfg = getPayPalConfig();
+    if (ppCfg.mode === 'live' && !ppCfg.webhookId) {
+      return res.status(500).json({ error: 'PAYPAL_WEBHOOK_ID must be configured in live mode' });
+    }
+
+    if (ppCfg.webhookId) {
+      const sigCheck = await verifyPayPalWebhookSignature(req);
+      if (!sigCheck.verified) {
+        console.warn('Rejected invalid PayPal webhook:', sigCheck.reason);
+        return res.status(401).json({ error: 'Unauthorized: Invalid PayPal webhook signature' });
+      }
+    }
+
     const event = req.body || {};
     const eventType = event.event_type || '';
     const subId = event.resource?.id || event.resource?.billing_agreement_id;

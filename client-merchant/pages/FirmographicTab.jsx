@@ -18,6 +18,7 @@ import {
   X,
   Lock,
 } from 'lucide-react';
+import { maskIpAddress } from './TrafficTab';
 
 /**
  * Format date string strictly without any time component
@@ -113,25 +114,6 @@ export default function FirmographicTab({
 
     return (
       <div className="space-y-6">
-        {/* Back Navigation Bar */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleBackToTable}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer group w-fit"
-          >
-            <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
-            <span>Back to Companies Table</span>
-          </button>
-
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500">Corporate Subnet:</span>
-            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
-              {activeCompany.activation_ip}
-            </span>
-          </div>
-        </div>
-
         {/* Selected Company Inspector */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-6 space-y-6">
           {/* Header Card */}
@@ -162,11 +144,21 @@ export default function FirmographicTab({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500">Total Visits:</span>
-              <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-md">
-                {activeCompany.total_visits || 1}
-              </span>
+            <div className="flex flex-col sm:items-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={handleBackToTable}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs cursor-pointer group w-fit"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
+                <span>Back to Companies Table</span>
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Total Visits:</span>
+                <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-md">
+                  {activeCompany.total_visits || 1}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -271,7 +263,7 @@ export default function FirmographicTab({
                       Activation IP:
                     </span>
                     <span className="font-mono font-bold text-slate-800">
-                      {activeCompany.activation_ip}
+                      {maskIpAddress(activeCompany.activation_ip)}
                     </span>
                   </div>
 
@@ -481,7 +473,7 @@ export default function FirmographicTab({
 
                       {/* IP Address */}
                       <td className="py-3.5 px-4 font-mono font-semibold text-slate-700">
-                        {c.activation_ip}
+                        {maskIpAddress(c.activation_ip)}
                       </td>
 
                       {/* Company Name */}
