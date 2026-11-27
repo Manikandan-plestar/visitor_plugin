@@ -22,9 +22,15 @@ export default function PayPalUpgradeModal({
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [billingCycle, setBillingCycle] = useState('monthly');
 
   const ppConfig = billingInfo?.paypal || {};
-  const isConfigured = Boolean(ppConfig.configured && ppConfig.client_id && ppConfig.plan_id);
+  const hasAnnual = Boolean(ppConfig.annual_plan_id);
+  const activePlanId =
+    billingCycle === 'annual' && ppConfig.annual_plan_id
+      ? ppConfig.annual_plan_id
+      : ppConfig.plan_id || ppConfig.annual_plan_id;
+  const isConfigured = Boolean(ppConfig.configured && ppConfig.client_id && activePlanId);
 
   useEffect(() => {
     if (!isOpen || !isConfigured) return;
@@ -48,7 +54,7 @@ export default function PayPalUpgradeModal({
             },
             createSubscription: (data, actions) => {
               return actions.subscription.create({
-                plan_id: ppConfig.plan_id,
+                plan_id: activePlanId,
               });
             },
             onApprove: async (data) => {
@@ -120,7 +126,7 @@ export default function PayPalUpgradeModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isConfigured, ppConfig.client_id, ppConfig.plan_id]);
+  }, [isOpen, isConfigured, ppConfig.client_id, activePlanId]);
 
   if (!isOpen) return null;
 
@@ -232,9 +238,41 @@ export default function PayPalUpgradeModal({
               </p>
             </div>
           ) : isConfigured ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {hasAnnual && ppConfig.plan_id && (
+                <div className="flex items-center justify-center gap-2 p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle('monthly')}
+                    className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                      billingCycle === 'monthly'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Monthly Plan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle('annual')}
+                    className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      billingCycle === 'annual'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>Annual Plan</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      billingCycle === 'annual' ? 'bg-amber-400 text-slate-950' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      Save
+                    </span>
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>Pay securely via PayPal Subscription</span>
+                <span>Pay securely via PayPal Subscription ({billingCycle === 'annual' ? 'Annual' : 'Monthly'})</span>
                 <span className="font-mono uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                   Mode: {ppConfig.mode}
                 </span>

@@ -32,6 +32,8 @@ import {
   Database,
   Radio,
   Cpu,
+  Crown,
+  StopCircle,
 } from 'lucide-react';
 
 export default function StaffDashboard() {
@@ -356,6 +358,44 @@ export default function StaffDashboard() {
     return stores.filter((s) => (s.status || '').toLowerCase() === 'watching');
   }, [stores]);
 
+  const [subFilter, setSubFilter] = useState('all');
+  const [stoppingSubId, setStoppingSubId] = useState(null);
+
+  const premiumSubscribers = useMemo(() => {
+    return stores.filter(
+      (s) => (s.plan_tier || 'free').toLowerCase() === 'premium' && (s.subscription_status || '').toLowerCase() === 'active'
+    );
+  }, [stores]);
+
+  const stoppedSubscribers = useMemo(() => {
+    return stores.filter((s) => (s.subscription_status || '').toLowerCase() === 'stopped_by_admin');
+  }, [stores]);
+
+  const handleStopSubscription = async (store) => {
+    if (!store) return;
+    if (!window.confirm(`Stop Premium subscription for ${store.site_url}? They will immediately revert to Free tier.`)) {
+      return;
+    }
+    setStoppingSubId(store.id);
+    try {
+      const res = await fetch('/api/v1/internal/admin/stop-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-staff-token': staffKey,
+        },
+        body: JSON.stringify({ store_id: store.id, site_url: store.site_url }),
+      });
+      if (res.ok) {
+        await fetchStaffData();
+      }
+    } catch (e) {
+      console.error('Stop subscription error:', e);
+    } finally {
+      setStoppingSubId(null);
+    }
+  };
+
   const filteredStores = useMemo(() => {
     let list = stores;
     if (statusFilter !== 'ALL') {
@@ -479,6 +519,24 @@ export default function StaffDashboard() {
                 {pendingStores.length}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('subscriptions')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all ${
+                activeTab === 'subscriptions'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                  : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <Crown className="w-4 h-4" />
+              <span>Subscriptions</span>
+              <span className={`ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                activeTab === 'subscriptions' ? 'bg-blue-700 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+              }`}>
+                {premiumSubscribers.length}
+              </span>
+            </button>
           </nav>
         </div>
 
@@ -518,6 +576,7 @@ export default function StaffDashboard() {
               {activeTab === 'all-stores' && 'All Registered Partner Stores'}
               {activeTab === 'activations' && 'Live Ingestion Feed & Activations'}
               {activeTab === 'enrichment' && 'Enrichment Workbench & IP Inspector'}
+              {activeTab === 'subscriptions' && 'PayPal Subscriptions & Plan Control'}
             </h1>
             <span className="text-[11px] text-slate-400 font-mono">
               Synced at {lastSynced}
@@ -1331,6 +1390,146 @@ export default function StaffDashboard() {
 
               </div>
 
+            </div>
+          )}
+
+          {/* ================================================================= */}
+          {/* 5. SUBSCRIPTIONS MONITOR & ADMIN STOP CONTROL                     */}
+          {/* ================================================================= */}
+          {activeTab === 'subscriptions' && (
+            <div className="space-y-5">
+              {/* Summary KPIs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Premium Stores</div>
+                  <div className="text-2xl font-black text-emerald-600 mt-1">{premiumSubscribers.length}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Verified PayPal subscriptions</div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stopped by Admin</div>
+                  <div className="text-2xl font-black text-rose-600 mt-1">{stoppedSubscribers.length}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Manually revoked due to bug/abuse</div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Registered Stores</div>
+                  <div className="text-2xl font-black text-slate-900 mt-1">{stores.length}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Free + Premium storefronts</div>
+                </div>
+              </div>
+
+              {/* Filter Bar */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-indigo-600" />
+                      Merchant Subscription Details
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Monitor start date, end/next billing date, PayPal ID, and stop any subscription if needed.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                    {[
+                      { id: 'all', label: 'All Stores' },
+                      { id: 'premium', label: 'Premium Active' },
+                      { id: 'stopped', label: 'Stopped / Free' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setSubFilter(f.id)}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          subFilter === f.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-4">Store / Company</th>
+                        <th className="py-3 px-4">Plan & Status</th>
+                        <th className="py-3 px-4">PayPal Subscription ID</th>
+                        <th className="py-3 px-4">Start Date</th>
+                        <th className="py-3 px-4">End / Next Billing</th>
+                        <th className="py-3 px-4 text-right">Admin Control</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {stores
+                        .filter((s) => {
+                          const tier = (s.plan_tier || 'free').toLowerCase();
+                          const status = (s.subscription_status || 'inactive').toLowerCase();
+                          if (subFilter === 'premium') return tier === 'premium' && status === 'active';
+                          if (subFilter === 'stopped') return tier !== 'premium' || status !== 'active';
+                          return true;
+                        })
+                        .map((s) => {
+                          const isPrem = (s.plan_tier || 'free').toLowerCase() === 'premium' && (s.subscription_status || '').toLowerCase() === 'active';
+                          const isStopped = (s.subscription_status || '').toLowerCase() === 'stopped_by_admin';
+                          return (
+                            <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3.5 px-4">
+                                <div className="font-bold text-slate-900">{s.company_name || s.site_name || 'WordPress Store'}</div>
+                                <div className="text-[11px] text-blue-600 font-mono truncate max-w-[240px]">{s.site_url}</div>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {isPrem ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <Crown className="w-3 h-3 text-amber-500" />
+                                    Premium Active
+                                  </span>
+                                ) : isStopped ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                    Stopped by Admin
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    Free ({s.subscription_status || 'inactive'})
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-[11px] text-slate-700">
+                                {s.paypal_subscription_id || '--'}
+                                {s.paypal_plan_id && (
+                                  <div className="text-[10px] text-slate-400">Plan: {s.paypal_plan_id}</div>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap text-slate-700">
+                                {s.plan_started_at ? formatDateTime(s.plan_started_at) : '--'}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap text-slate-700">
+                                {s.plan_expires_at ? formatDateTime(s.plan_expires_at) : '--'}
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                {isPrem ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStopSubscription(s)}
+                                    disabled={stoppingSubId === s.id}
+                                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                                  >
+                                    <StopCircle className="w-3.5 h-3.5" />
+                                    <span>{stoppingSubId === s.id ? 'Stopping...' : 'Stop Subscription'}</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400">--</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 

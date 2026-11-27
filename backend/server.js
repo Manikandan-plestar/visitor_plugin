@@ -157,6 +157,7 @@ function getPayPalConfig() {
     clientId: (process.env.PAYPAL_CLIENT_ID || '').trim(),
     clientSecret: (process.env.PAYPAL_CLIENT_SECRET || '').trim(),
     planId: (process.env.PAYPAL_PREMIUM_PLAN_ID || '').trim(),
+    annualPlanId: (process.env.PAYPAL_ANNUAL_PLAN_ID || '').trim(),
     webhookId: (process.env.PAYPAL_WEBHOOK_ID || '').trim(),
   };
 }
@@ -203,6 +204,57 @@ async function getPayPalAccessToken() {
     throw new Error('Failed to authenticate with PayPal OAuth API.');
   }
   return { token: resp.data.access_token, cfg };
+}
+
+// Auto-sync PayPal subscription if plan_expires_at has passed (works without webhooks)
+async function syncPayPalSubscriptionIfExpired(store) {
+  if (!store || !store.paypal_subscription_id) return store;
+  if ((store.subscription_status || '').toLowerCase() === 'stopped_by_admin') return store;
+  if ((store.plan_tier || '').toLowerCase() !== 'premium') return store;
+  if (!store.plan_expires_at || new Date(store.plan_expires_at).getTime() >= Date.now()) return store;
+
+  try {
+    const { token, cfg } = await getPayPalAccessToken();
+    const ppResp = await httpsJsonRequest({
+      hostname: cfg.host,
+      path: `/v1/billing/subscriptions/${encodeURIComponent(store.paypal_subscription_id)}`,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (ppResp.status === 200 && ppResp.data) {
+      const subStatus = (ppResp.data.status || '').toUpperCase();
+      if (subStatus === 'ACTIVE' || subStatus === 'APPROVED') {
+        const nextBilling = ppResp.data.billing_info?.next_billing_time
+          ? new Date(ppResp.data.billing_info.next_billing_time)
+          : new Date(Date.now() + 31 * 86400000);
+        if (getIsConnected()) {
+          await getPool().query(
+            `UPDATE svt_stores SET plan_tier = 'premium', subscription_status = 'active', plan_expires_at = ?, updated_at = NOW() WHERE site_url = ?`,
+            [nextBilling, store.site_url]
+          );
+        }
+        store.plan_tier = 'premium';
+        store.subscription_status = 'active';
+        store.plan_expires_at = nextBilling.toISOString();
+      } else {
+        const newStatus = subStatus.toLowerCase() || 'expired';
+        if (getIsConnected()) {
+          await getPool().query(
+            `UPDATE svt_stores SET plan_tier = 'free', subscription_status = ?, updated_at = NOW() WHERE site_url = ?`,
+            [newStatus, store.site_url]
+          );
+        }
+        store.plan_tier = 'free';
+        store.subscription_status = newStatus;
+      }
+    }
+  } catch (e) {
+    console.warn('PayPal auto-sync skipped:', e.message);
+  }
+  return store;
 }
 
 // Helper: Parse single Master Switch from config.php (AMAZER_ENVIRONMENT: 'local' | 'live')
@@ -1466,7 +1518,7 @@ app.get('/api/v1/billing/status', rateLimitMiddleware, async (req, res) => {
     if (!access.authorized) {
       return res.status(401).json({ error: 'Unauthorized: Invalid store API key' });
     }
-    const store = access.store;
+    const store = await syncPayPalSubscriptionIfExpired(access.store);
     const isPremium = isStorePremium(store);
     const ppCfg = getPayPalConfig();
 
@@ -1475,13 +1527,15 @@ app.get('/api/v1/billing/status', rateLimitMiddleware, async (req, res) => {
       plan_tier: isPremium ? 'premium' : 'free',
       subscription_status: store?.subscription_status || 'inactive',
       paypal_subscription_id: store?.paypal_subscription_id || null,
+      plan_started_at: store?.plan_started_at || null,
       plan_expires_at: store?.plan_expires_at || null,
       limits: FREE_LIMITS,
       paypal: {
-        configured: Boolean(ppCfg.clientId && ppCfg.clientSecret && ppCfg.planId),
+        configured: Boolean(ppCfg.clientId && ppCfg.clientSecret && (ppCfg.planId || ppCfg.annualPlanId)),
         mode: ppCfg.mode,
         client_id: ppCfg.clientId || null,
         plan_id: ppCfg.planId || null,
+        annual_plan_id: ppCfg.annualPlanId || null,
       },
     });
   } catch (err) {
@@ -1524,10 +1578,12 @@ app.post('/api/v1/billing/paypal/activate', rateLimitMiddleware, async (req, res
       return res.status(400).json({ error: `PayPal subscription is not active (status: ${subStatus})` });
     }
 
-    if (cfg.planId && ppResp.data.plan_id && ppResp.data.plan_id !== cfg.planId) {
+    const allowedPlanIds = [cfg.planId, cfg.annualPlanId].filter(Boolean);
+    if (allowedPlanIds.length > 0 && ppResp.data.plan_id && !allowedPlanIds.includes(ppResp.data.plan_id)) {
       return res.status(400).json({ error: 'PayPal plan_id mismatch' });
     }
 
+    const startedAt = ppResp.data.start_time ? new Date(ppResp.data.start_time) : new Date();
     const nextBilling = ppResp.data.billing_info?.next_billing_time
       ? new Date(ppResp.data.billing_info.next_billing_time)
       : new Date(Date.now() + 31 * 86400000);
@@ -1539,16 +1595,18 @@ app.post('/api/v1/billing/paypal/activate', rateLimitMiddleware, async (req, res
              subscription_status = 'active',
              paypal_subscription_id = ?,
              paypal_plan_id = ?,
+             plan_started_at = ?,
              plan_expires_at = ?,
              updated_at = NOW()
          WHERE site_url = ?`,
-        [subscriptionID, ppResp.data.plan_id || cfg.planId || '', nextBilling, cleanTarget]
+        [subscriptionID, ppResp.data.plan_id || cfg.planId || '', startedAt, nextBilling, cleanTarget]
       );
     } else if (access.store) {
       access.store.plan_tier = 'premium';
       access.store.subscription_status = 'active';
       access.store.paypal_subscription_id = subscriptionID;
       access.store.paypal_plan_id = ppResp.data.plan_id || cfg.planId || '';
+      access.store.plan_started_at = startedAt.toISOString();
       access.store.plan_expires_at = nextBilling.toISOString();
     }
 
@@ -1557,6 +1615,7 @@ app.post('/api/v1/billing/paypal/activate', rateLimitMiddleware, async (req, res
       plan_tier: 'premium',
       subscription_status: 'active',
       paypal_subscription_id: subscriptionID,
+      plan_started_at: startedAt.toISOString(),
       plan_expires_at: nextBilling.toISOString(),
     });
   } catch (err) {
@@ -1670,6 +1729,50 @@ app.post('/api/v1/webhooks/paypal', async (req, res) => {
 // ============================================================================
 // 4. SECURE INTERNAL STAFF API (Protected by x-staff-token)
 // ============================================================================
+app.post('/api/v1/internal/admin/stop-subscription', requireStaffAuth, async (req, res) => {
+  try {
+    const { store_id, site_url } = req.body || {};
+    if (!store_id && !site_url) {
+      return res.status(400).json({ error: 'store_id or site_url is required' });
+    }
+
+    if (getIsConnected()) {
+      const pool = getPool();
+      if (store_id) {
+        await pool.query(
+          `UPDATE svt_stores
+           SET plan_tier = 'free', subscription_status = 'stopped_by_admin', updated_at = NOW()
+           WHERE id = ?`,
+          [store_id]
+        );
+      } else {
+        const cleanUrl = normalizeUrl(site_url);
+        await pool.query(
+          `UPDATE svt_stores
+           SET plan_tier = 'free', subscription_status = 'stopped_by_admin', updated_at = NOW()
+           WHERE site_url = ?`,
+          [cleanUrl]
+        );
+      }
+      return res.json({ success: true, message: 'Subscription stopped by admin.' });
+    } else {
+      const cleanUrl = site_url ? normalizeUrl(site_url) : '';
+      const target = memoryDb.stores.find(
+        (s) => (store_id && String(s.id) === String(store_id)) || (cleanUrl && s.site_url === cleanUrl)
+      );
+      if (target) {
+        target.plan_tier = 'free';
+        target.subscription_status = 'stopped_by_admin';
+        target.updated_at = new Date().toISOString();
+      }
+      return res.json({ success: true, message: 'Subscription stopped by admin (memory).' });
+    }
+  } catch (err) {
+    console.error('Error in /internal/admin/stop-subscription:', err);
+    res.status(500).json({ error: 'Failed to stop subscription' });
+  }
+});
+
 app.get('/api/v1/internal/admin/stats', requireStaffAuth, async (req, res) => {
   try {
     if (getIsConnected()) {

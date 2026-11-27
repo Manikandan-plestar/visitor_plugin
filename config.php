@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // 🎯 MASTER SWITCH: Set to 'local' or 'live'
 // ============================================================================
 if ( ! defined( 'AMAZER_ENVIRONMENT' ) ) {
-    define( 'AMAZER_ENVIRONMENT', 'local' ); // <-- CHANGE HERE: 'local' OR 'live'
+    define( 'AMAZER_ENVIRONMENT', 'live' ); // <-- CHANGE HERE: 'local' OR 'live'
 }
 
 // Defined URLs for each environment

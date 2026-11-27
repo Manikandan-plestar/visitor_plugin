@@ -90,6 +90,7 @@ async function createTables() {
       subscription_status VARCHAR(32) DEFAULT 'inactive',
       paypal_subscription_id VARCHAR(128) NULL,
       paypal_plan_id VARCHAR(128) NULL,
+      plan_started_at DATETIME NULL,
       plan_expires_at DATETIME NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -106,6 +107,7 @@ async function createTables() {
     "ALTER TABLE svt_stores ADD COLUMN subscription_status VARCHAR(32) DEFAULT 'inactive'",
     "ALTER TABLE svt_stores ADD COLUMN paypal_subscription_id VARCHAR(128) NULL",
     "ALTER TABLE svt_stores ADD COLUMN paypal_plan_id VARCHAR(128) NULL",
+    "ALTER TABLE svt_stores ADD COLUMN plan_started_at DATETIME NULL",
     "ALTER TABLE svt_stores ADD COLUMN plan_expires_at DATETIME NULL",
   ];
   for (const sql of storeMigrations) {

@@ -2,7 +2,7 @@
 Contributors: amazerinc, amazerplugins
 Tags: amazer analytics, visitor intelligence, whois analytics, visitor tracking, b2b intelligence
 Requires at least: 5.8
-Tested up to: 7.1
+Tested up to: 6.7
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPL-2.0-or-later
@@ -16,25 +16,32 @@ Real-time B2B visitor tracking and corporate reverse-IP identification. Reveal v
 
 ### Key Capabilities:
 * **Real-Time Reverse-IP Intelligence**: Automatically identifies corporate visitor networks, company names, industry, and corporate headquarters.
-* **Corporate IP & Telemetry**: Inspect individual company activation IPs, duration on site, and specific browsed URLs.
-* **Dual Intelligence View**: Toggle between *All Identified* corporate prospects and *General Visitors* with deep hit journeys.
+* **Corporate IP & Telemetry**: Inspect individual company visits, duration on site, and specific browsed URLs.
+* **High-Intent & Conversion Tracking**: Automatically highlights visitors spending time on commercial intent pages and tracks goal conversions.
+* **Competitor Footprint & Slipped Prospects**: Optionally participates in the Amazer B2B network to surface anonymous cross-store shopping signals across participating stores.
 * **Explicit Opt-in Consent**: Full compliance with privacy standards and WordPress Guideline 7. Enable or disable storefront telemetry anytime from the dashboard.
-* **High-Intent Lead Scoring**: Automatically highlights visitors showing commercial intent (browsing pricing, product specs, or checkout pages).
+* **Freemium & Premium Access**: Includes a free tier across all dashboard screens, with optional Premium subscription upgrades via PayPal for unlimited leads and unmasked B2B contact details.
 
 ### 3rd Party Service Disclosure
-This plugin relies on a 3rd-party SaaS API service to perform real-time reverse-IP resolution, geolocation lookup, and company enrichment:
-* **Service Provider**: Amazer Cloud API (by Plestar Inc.)
-* **Service URL**: https://apps.plestarinc.com:3011
-* **Terms of Service**: https://plestar.net/amazer-analytics/terms.html
-* **Privacy Policy**: https://plestar.net/amazer-analytics/privacy.html
+This plugin relies on the following external SaaS services:
+
+1. **Amazer Cloud API (by Plestar Inc.)** — Performs real-time reverse-IP resolution, geolocation lookup, company enrichment, and optional cross-store B2B network matching (Footprint & Slipped) across participating stores.
+   * **Service URL**: https://apps.plestarinc.com:3011
+   * **Terms of Service**: https://plestar.net/amazer-analytics/terms.html
+   * **Privacy Policy**: https://plestar.net/amazer-analytics/privacy.html
+
+2. **PayPal Subscriptions & Checkout SDK** — Loaded only in the WordPress Admin dashboard when an administrator opens the Upgrade modal to subscribe to a Premium plan.
+   * **Service URL**: https://www.paypal.com/sdk/js
+   * **Terms of Service**: https://www.paypal.com/legalhub/useragreement-full
+   * **Privacy Policy**: https://www.paypal.com/legalhub/privacy-full
 
 == Source Code & Build Instructions ==
 
 The human-readable source code for the minified frontend bundle (dist/bundle.js) is publicly maintained and available in the following repository:
-* Repository URL: https://github.com/amazer-inc/Amazer-Visitor-Intelligence
+* Repository URL: https://github.com/Manikandan-plestar/visitor_plugin
 
 To build or compile the JavaScript bundle from source:
-1. Clone the repository: `git clone https://github.com/amazer-inc/Amazer-Visitor-Intelligence.git`
+1. Clone the repository: `git clone https://github.com/Manikandan-plestar/visitor_plugin.git`
 2. Change into the plugin directory and install dependencies:
    `npm install`
 3. Compile the production bundle:
@@ -55,8 +62,8 @@ No. In strict compliance with WordPress.org Guideline 7, storefront telemetry re
 = Does this plugin slow down my store? =
 No. Visitor telemetry is dispatched asynchronously using the browser's native `navigator.sendBeacon` API. If `sendBeacon` is unsupported, it falls back to a non-blocking background fetch call that never impedes page render time or customer experience.
 
-= How does reverse-IP intelligence work? =
-When a business visitor lands on your store, their corporate IP address is cross-referenced with public WHOIS registries, corporate ASN subnets, and the central B2B knowledge network to resolve company names, headquarters, and industry vertical.
+= How does Cross-Store Footprint & Slipped matching work? =
+When enabled, anonymized IP telemetry from participating stores running the plugin is matched on the Amazer Cloud API to highlight cross-store market intent without exposing unauthorized third-party browser data or personal consumer PII.
 
 = Where are Terms and Privacy hosted? =
 Full Terms of Service and Privacy Policy are available at https://plestar.net/amazer-analytics/terms.html and https://plestar.net/amazer-analytics/privacy.html.
@@ -64,4 +71,4 @@ Full Terms of Service and Privacy Policy are available at https://plestar.net/am
 == Changelog ==
 
 = 1.0.0 =
-* Initial public release with real-time reverse-IP lookup, dual intelligence feed, and zero-friction activation.
+* Initial public release with real-time reverse-IP lookup, High Intent, Conversion, Slipped, Competitor Footprint, and PayPal Premium subscriptions.

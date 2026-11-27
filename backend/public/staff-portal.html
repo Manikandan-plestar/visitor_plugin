@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amazer Analytics (Whois) - Staff Operations Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .custom-scroll::-webkit-scrollbar { width: 6px; }
@@ -12,136 +13,315 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
-  <!-- Top Navigation -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
+  <!-- Left Fixed Sidebar Navigation -->
+  <aside class="w-full lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:z-40 bg-slate-950 text-slate-300 flex flex-col justify-between shrink-0 border-r border-slate-800">
+    <div>
+      <!-- Brand -->
+      <div class="h-16 px-5 border-b border-slate-800/80 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20 shrink-0">
           A
         </div>
-        <div>
-          <h1 class="font-bold text-slate-900 text-lg leading-tight flex items-center gap-2">
-            Amazer Analytics (Whois)
-            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Staff Portal</span>
-          </h1>
-          <p class="text-xs text-slate-500">Internal B2B Storefront & Reverse-IP Operations Center</p>
+        <div class="min-w-0">
+          <div class="font-bold text-white text-sm leading-tight truncate">Amazer Analytics</div>
+          <div class="text-[11px] text-indigo-300 font-semibold">Staff Operations</div>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <!-- Master Environment Status (Driven by config.php) -->
-        <span id="master-env-badge" class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-          <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-          <span id="master-env-text">Mode: Local Dev (4000)</span>
-        </span>
-        <button onclick="openCreateModal()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition flex items-center gap-1.5 cursor-pointer">
+
+      <!-- Menu -->
+      <nav class="p-3 space-y-1 text-xs">
+        <button type="button" onclick="switchTab('overview')" data-tab="overview" class="staff-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold shadow-sm transition-all cursor-pointer">
+          <span class="flex items-center gap-2.5">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            <span>Overview & KPIs</span>
+          </span>
+        </button>
+
+        <button type="button" onclick="switchTab('stores')" data-tab="stores" class="staff-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-white font-semibold transition-all cursor-pointer">
+          <span class="flex items-center gap-2.5">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <span>Enterprises & Stores</span>
+          </span>
+          <span id="nav-stores-count" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">0</span>
+        </button>
+
+        <button type="button" onclick="switchTab('subscriptions')" data-tab="subscriptions" class="staff-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-white font-semibold transition-all cursor-pointer">
+          <span class="flex items-center gap-2.5">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+            <span>Subscriptions</span>
+          </span>
+          <span id="nav-subs-count" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">0</span>
+        </button>
+
+        <button type="button" onclick="switchTab('lookup')" data-tab="lookup" class="staff-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-white font-semibold transition-all cursor-pointer">
+          <span class="flex items-center gap-2.5">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span>Reverse-IP Lookup</span>
+          </span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Bottom Mode Status -->
+    <div class="p-4 border-t border-slate-800/80 space-y-2">
+      <span id="master-env-badge" class="w-full inline-flex items-center gap-2 text-[11px] font-bold px-3 py-2 rounded-xl bg-slate-900 text-blue-300 border border-slate-800">
+        <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0"></span>
+        <span id="master-env-text" class="truncate">Mode: Local Dev (4000)</span>
+      </span>
+    </div>
+  </aside>
+
+  <!-- Right Main Content Area -->
+  <div class="lg:pl-64 min-h-screen flex flex-col min-w-0">
+    <!-- Top Sticky Header -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shrink-0">
+      <div>
+        <h1 id="page-title" class="font-bold text-slate-900 text-base">Overview & KPIs</h1>
+        <p class="text-[11px] text-slate-500">Internal B2B Storefront, Reverse-IP & Subscription Operations Center</p>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <button onclick="openCreateModal()" class="px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition flex items-center gap-1.5 cursor-pointer">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Add New Company / Store
+          <span>Add New Store</span>
         </button>
-        <button onclick="fetchStaffData()" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 cursor-pointer">
+        <button onclick="fetchStaffData()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 cursor-pointer">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Refresh
+          <span>Refresh</span>
         </button>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-    <!-- Toast Notification -->
-    <div id="toast" class="hidden fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-xl flex items-center gap-2">
-      <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-      <span id="toast-msg">Action successful</span>
-    </div>
+    <main class="flex-1 p-6 space-y-6">
+      <!-- Toast Notification -->
+      <div id="toast" class="hidden fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-xl flex items-center gap-2">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span id="toast-msg">Action successful</span>
+      </div>
 
-    <!-- KPI Overview Cards -->
-    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Stores</p>
-        <p id="kpi-total" class="text-2xl font-black text-slate-900 mt-2">--</p>
-        <span class="text-[11px] text-slate-400 mt-1 block">Registered endpoints</span>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Today's Active</p>
-        <p id="kpi-today" class="text-2xl font-black text-blue-600 mt-2">--</p>
-        <span class="text-[11px] text-slate-400 mt-1 block">New activations</span>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Verified B2B</p>
-        <p id="kpi-verified" class="text-2xl font-black text-emerald-600 mt-2">--</p>
-        <span class="text-[11px] text-slate-400 mt-1 block">Enriched entities</span>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Watching</p>
-        <p id="kpi-watching" class="text-2xl font-black text-amber-600 mt-2">--</p>
-        <span class="text-[11px] text-slate-400 mt-1 block">High commercial intent</span>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Queue</p>
-        <p id="kpi-pending" class="text-2xl font-black text-purple-600 mt-2">--</p>
-        <span class="text-[11px] text-slate-400 mt-1 block">Awaiting enrichment</span>
-      </div>
-    </section>
-
-    <!-- Quick Reverse-IP Lookup Tool -->
-    <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <div>
-          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            Instant Reverse-IP Lookup & Geolocation Test
-          </h2>
-          <p class="text-xs text-slate-500">Query public WHOIS, ASN subnet and reverse DNS records for any corporate IP</p>
-        </div>
-      </div>
-      <div class="flex gap-3">
-        <input id="ip-input" type="text" placeholder="e.g. 159.215.1.10 or 139.15.20.45" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button onclick="handleLookupIp()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition">
-          Lookup IP
-        </button>
-      </div>
-      <div id="ip-result" class="mt-4 hidden p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1"></div>
-    </section>
-
-    <!-- Stores & Enterprises Table -->
-    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 class="text-base font-bold text-slate-900">Enriched B2B Enterprises & Stores</h2>
-          <p class="text-xs text-slate-500">All registered storefronts and identified corporate visitor profiles</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <!-- Status Filter -->
-          <div class="flex rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600">
-            <button onclick="filterStatus('ALL')" class="filter-btn px-3 py-1.5 rounded-lg bg-white shadow-sm text-slate-900" data-status="ALL">All</button>
-            <button onclick="filterStatus('Verified')" class="filter-btn px-3 py-1.5 rounded-lg hover:text-slate-900" data-status="Verified">Verified</button>
-            <button onclick="filterStatus('Watching')" class="filter-btn px-3 py-1.5 rounded-lg hover:text-slate-900" data-status="Watching">Watching</button>
-            <button onclick="filterStatus('Pending')" class="filter-btn px-3 py-1.5 rounded-lg hover:text-slate-900" data-status="Pending">Pending</button>
+      <!-- SECTION 1: OVERVIEW & KPIs -->
+      <div id="section-overview" class="staff-section space-y-6">
+        <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Stores</p>
+            <p id="kpi-total" class="text-2xl font-black text-slate-900 mt-2">--</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Registered endpoints</span>
           </div>
-          <!-- Search Box -->
-          <input id="search-input" oninput="renderTable()" type="text" placeholder="Search companies or IPs..." class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-56">
-        </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Today's Active</p>
+            <p id="kpi-today" class="text-2xl font-black text-blue-600 mt-2">--</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">New activations</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Verified B2B</p>
+            <p id="kpi-verified" class="text-2xl font-black text-emerald-600 mt-2">--</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Enriched entities</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Watching</p>
+            <p id="kpi-watching" class="text-2xl font-black text-amber-600 mt-2">--</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">High commercial intent</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Queue</p>
+            <p id="kpi-pending" class="text-2xl font-black text-purple-600 mt-2">--</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Awaiting enrichment</span>
+          </div>
+        </section>
+
+        <!-- Overview Charts -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="lg:col-span-8 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Store Registrations (Last 14 Days)</h3>
+                <p class="text-[11px] text-slate-500">Daily new plugin activations & registered domains</p>
+              </div>
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">14-Day Trend</span>
+            </div>
+            <div class="h-64">
+              <canvas id="overviewActivationsChart"></canvas>
+            </div>
+          </div>
+
+          <div class="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Verification Status Breakdown</h3>
+              <p class="text-[11px] text-slate-500">Verified vs. Watching vs. Pending stores</p>
+            </div>
+            <div class="h-56 flex items-center justify-center my-2">
+              <canvas id="overviewStatusChart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick Navigation Cards -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div onclick="switchTab('stores')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 cursor-pointer transition">
+            <h3 class="text-sm font-bold text-slate-900">Enterprises & Stores Directory</h3>
+            <p class="text-xs text-slate-500 mt-1">Review pending stores, verify corporate profiles, and enrich IPs.</p>
+          </div>
+          <div onclick="switchTab('subscriptions')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-300 cursor-pointer transition">
+            <h3 class="text-sm font-bold text-slate-900">PayPal Subscriptions Monitor</h3>
+            <p class="text-xs text-slate-500 mt-1">Track subscription start/end dates and stop subscriptions if needed.</p>
+          </div>
+          <div onclick="switchTab('lookup')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 cursor-pointer transition">
+            <h3 class="text-sm font-bold text-slate-900">Reverse-IP Lookup Tool</h3>
+            <p class="text-xs text-slate-500 mt-1">Query public WHOIS, ASN subnet, and geolocation for any IP.</p>
+          </div>
+        </section>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
-              <th class="py-3 px-5">Company / Storefront</th>
-              <th class="py-3 px-4">Corporate IP</th>
-              <th class="py-3 px-4">Industry</th>
-              <th class="py-3 px-4">Status</th>
-              <th class="py-3 px-4">Contact & Location</th>
-              <th class="py-3 px-5 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="stores-tbody" class="divide-y divide-slate-100 text-slate-700">
-            <tr>
-              <td colspan="6" class="text-center py-12 text-slate-400">Loading data from database...</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- SECTION 2: REVERSE-IP LOOKUP -->
+      <div id="section-lookup" class="staff-section hidden space-y-6">
+        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Instant Reverse-IP Lookup & Geolocation Test
+              </h2>
+              <p class="text-xs text-slate-500">Query public WHOIS, ASN subnet and reverse DNS records for any corporate IP</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <input id="ip-input" type="text" placeholder="e.g. 159.215.1.10 or 139.15.20.45" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="handleLookupIp()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition cursor-pointer">
+              Lookup IP
+            </button>
+          </div>
+          <div id="ip-result" class="mt-4 hidden p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1"></div>
+        </section>
       </div>
-    </section>
-  </main>
+
+      <!-- SECTION 3: PAYPAL SUBSCRIPTIONS MONITOR -->
+      <div id="section-subscriptions" class="staff-section hidden space-y-6">
+        <!-- Subscription KPIs -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Premium</p>
+            <p id="sub-kpi-active" class="text-2xl font-black text-emerald-600 mt-2">0</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Paid PayPal subscriptions</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Free Plan Stores</p>
+            <p id="sub-kpi-free" class="text-2xl font-black text-slate-800 mt-2">0</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">On normal free tier</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Stopped by Admin</p>
+            <p id="sub-kpi-stopped" class="text-2xl font-black text-rose-600 mt-2">0</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Revoked subscriptions</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid Conversion Rate</p>
+            <p id="sub-kpi-rate" class="text-2xl font-black text-indigo-600 mt-2">0%</p>
+            <span class="text-[11px] text-slate-400 mt-1 block">Premium / Total stores</span>
+          </div>
+        </section>
+
+        <!-- Subscription Analytics Charts -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Subscription Activations (Last 14 Days)</h3>
+                <p class="text-[11px] text-slate-500">New PayPal Premium upgrades by start date</p>
+              </div>
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">Upgrades</span>
+            </div>
+            <div class="h-56">
+              <canvas id="subTrendChart"></canvas>
+            </div>
+          </div>
+
+          <div class="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Plan Tier Distribution</h3>
+              <p class="text-[11px] text-slate-500">Active Premium vs. Free vs. Stopped by Admin</p>
+            </div>
+            <div class="h-52 flex items-center justify-center my-1">
+              <canvas id="subTierChart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">PayPal Subscriptions Monitor</h2>
+              <p class="text-xs text-slate-500">Monitor subscription start date, end/next billing date, PayPal ID, and stop any subscription if needed</p>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span id="sub-active-count" class="px-3 py-1 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">0 Active Premium</span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                  <th class="py-3 px-5">Store / Company</th>
+                  <th class="py-3 px-4">Plan & Status</th>
+                  <th class="py-3 px-4">PayPal Subscription ID</th>
+                  <th class="py-3 px-4">Start Date</th>
+                  <th class="py-3 px-4">End / Next Billing</th>
+                  <th class="py-3 px-5 text-right">Admin Control</th>
+                </tr>
+              </thead>
+              <tbody id="subscriptions-tbody" class="divide-y divide-slate-100 text-slate-700">
+                <tr>
+                  <td colspan="6" class="text-center py-8 text-slate-400">Loading subscriptions...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- SECTION 4: ENTERPRISES & STORES -->
+      <div id="section-stores" class="staff-section hidden space-y-6">
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Enriched B2B Enterprises & Stores</h2>
+              <p class="text-xs text-slate-500">All registered storefronts and identified corporate visitor profiles</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+              <!-- Status Filter -->
+              <div class="flex rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600">
+                <button onclick="filterStatus('ALL')" class="filter-btn px-3 py-1.5 rounded-lg bg-white shadow-sm text-slate-900" data-status="ALL">All</button>
+                <button onclick="filterStatus('Verified')" class="filter-btn px-3 py-1.5 rounded-lg hover:text-slate-900" data-status="Verified">Verified</button>
+                <button onclick="filterStatus('Watching')" class="filter-btn px-3 py-1.5 rounded-lg hover:text-slate-900" data-status="Watching">Watching</button>
+                <button onclick="filterStatus('Pending')" class="filter-btn px-3 py-1.5 rounded-lg hover:text-slate-900" data-status="Pending">Pending</button>
+              </div>
+              <!-- Search Box -->
+              <input id="search-input" oninput="renderTable()" type="text" placeholder="Search companies or IPs..." class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-56">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                  <th class="py-3 px-5">Company / Storefront</th>
+                  <th class="py-3 px-4">Corporate IP</th>
+                  <th class="py-3 px-4">Industry</th>
+                  <th class="py-3 px-4">Registered Date</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4">Contact & Location</th>
+                  <th class="py-3 px-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="stores-tbody" class="divide-y divide-slate-100 text-slate-700">
+                <tr>
+                  <td colspan="6" class="text-center py-12 text-slate-400">Loading data from database...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
 
   <!-- Edit / Modify Store Modal -->
   <div id="edit-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -353,10 +533,247 @@
 
         allStores = data.stores || [];
         renderTable();
+        renderSubscriptionsTable();
+        renderCharts();
       } catch (err) {
         document.getElementById('stores-tbody').innerHTML = `
           <tr><td colspan="6" class="text-center py-12 text-rose-500 font-medium">Failed to connect to database backend: ${err.message}</td></tr>
         `;
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.staff-section').forEach(sec => sec.classList.add('hidden'));
+      const target = document.getElementById('section-' + tabId);
+      if (target) target.classList.remove('hidden');
+
+      const titles = {
+        overview: 'Overview & KPIs',
+        stores: 'Enterprises & Stores Directory',
+        subscriptions: 'PayPal Subscriptions Monitor',
+        lookup: 'Reverse-IP Lookup Tool'
+      };
+      const titleEl = document.getElementById('page-title');
+      if (titleEl) titleEl.textContent = titles[tabId] || 'Staff Operations';
+
+      document.querySelectorAll('.staff-nav-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabId) {
+          btn.className = 'staff-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold shadow-sm transition-all cursor-pointer';
+        } else {
+          btn.className = 'staff-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-900 hover:text-white font-semibold transition-all cursor-pointer';
+        }
+      });
+
+      if (tabId === 'overview' || tabId === 'subscriptions') {
+        setTimeout(renderCharts, 50);
+      }
+    }
+
+    let chartInstances = {};
+    function renderCharts() {
+      if (typeof Chart === 'undefined') return;
+
+      // Build last 14 days labels
+      const days = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000);
+        days.push({
+          key: d.toISOString().slice(0, 10),
+          label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        });
+      }
+
+      // 1. Overview 14-Day Store Registrations
+      const regCounts = days.map(day =>
+        allStores.filter(s => s.created_at && new Date(s.created_at).toISOString().slice(0, 10) === day.key).length
+      );
+      const ctx1 = document.getElementById('overviewActivationsChart');
+      if (ctx1) {
+        if (chartInstances.overviewAct) chartInstances.overviewAct.destroy();
+        chartInstances.overviewAct = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: days.map(d => d.label),
+            datasets: [{
+              label: 'New Stores',
+              data: regCounts,
+              backgroundColor: '#4f46e5',
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+          }
+        });
+      }
+
+      // 2. Overview Status Doughnut
+      const verCnt = allStores.filter(s => (s.status || '').toLowerCase() === 'verified').length;
+      const watCnt = allStores.filter(s => (s.status || '').toLowerCase() === 'watching').length;
+      const penCnt = allStores.filter(s => (s.status || 'pending').toLowerCase() === 'pending').length;
+      const ctx2 = document.getElementById('overviewStatusChart');
+      if (ctx2) {
+        if (chartInstances.overviewStatus) chartInstances.overviewStatus.destroy();
+        chartInstances.overviewStatus = new Chart(ctx2, {
+          type: 'doughnut',
+          data: {
+            labels: ['Verified', 'Watching', 'Pending'],
+            datasets: [{
+              data: [verCnt, watCnt, penCnt],
+              backgroundColor: ['#10b981', '#f59e0b', '#94a3b8'],
+              borderWidth: 0,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+          }
+        });
+      }
+
+      // 3. Subscription KPIs & Charts
+      const activePrem = allStores.filter(s => (s.plan_tier || 'free').toLowerCase() === 'premium' && (s.subscription_status || '').toLowerCase() === 'active').length;
+      const stoppedCnt = allStores.filter(s => (s.subscription_status || '').toLowerCase() === 'stopped_by_admin').length;
+      const freeCnt = Math.max(0, allStores.length - activePrem - stoppedCnt);
+      const convRate = allStores.length > 0 ? Math.round((activePrem / allStores.length) * 100) : 0;
+
+      const elA = document.getElementById('sub-kpi-active');
+      const elF = document.getElementById('sub-kpi-free');
+      const elS = document.getElementById('sub-kpi-stopped');
+      const elR = document.getElementById('sub-kpi-rate');
+      if (elA) elA.textContent = activePrem;
+      if (elF) elF.textContent = freeCnt;
+      if (elS) elS.textContent = stoppedCnt;
+      if (elR) elR.textContent = convRate + '%';
+
+      const subCounts = days.map(day =>
+        allStores.filter(s => s.plan_started_at && new Date(s.plan_started_at).toISOString().slice(0, 10) === day.key).length
+      );
+      const ctx3 = document.getElementById('subTrendChart');
+      if (ctx3) {
+        if (chartInstances.subTrend) chartInstances.subTrend.destroy();
+        chartInstances.subTrend = new Chart(ctx3, {
+          type: 'bar',
+          data: {
+            labels: days.map(d => d.label),
+            datasets: [{
+              label: 'New Upgrades',
+              data: subCounts,
+              backgroundColor: '#10b981',
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+          }
+        });
+      }
+
+      const ctx4 = document.getElementById('subTierChart');
+      if (ctx4) {
+        if (chartInstances.subTier) chartInstances.subTier.destroy();
+        chartInstances.subTier = new Chart(ctx4, {
+          type: 'doughnut',
+          data: {
+            labels: ['Active Premium', 'Free Plan', 'Stopped by Admin'],
+            datasets: [{
+              data: [activePrem, freeCnt, stoppedCnt],
+              backgroundColor: ['#10b981', '#cbd5e1', '#f43f5e'],
+              borderWidth: 0,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+          }
+        });
+      }
+    }
+
+    function formatSubDate(dt) {
+      if (!dt) return '--';
+      try {
+        return new Date(dt).toLocaleString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      } catch (e) {
+        return String(dt);
+      }
+    }
+
+    function renderSubscriptionsTable() {
+      const tbody = document.getElementById('subscriptions-tbody');
+      const countBadge = document.getElementById('sub-active-count');
+      if (!tbody) return;
+
+      const activePrem = allStores.filter(s => (s.plan_tier || 'free').toLowerCase() === 'premium' && (s.subscription_status || '').toLowerCase() === 'active');
+      if (countBadge) countBadge.textContent = `${activePrem.length} Active Premium`;
+      const navStores = document.getElementById('nav-stores-count');
+      const navSubs = document.getElementById('nav-subs-count');
+      if (navStores) navStores.textContent = allStores.length;
+      if (navSubs) navSubs.textContent = activePrem.length;
+
+      const subRows = allStores.filter(s => s.paypal_subscription_id || (s.plan_tier || '').toLowerCase() === 'premium' || (s.subscription_status || '').toLowerCase() === 'stopped_by_admin');
+      if (subRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">No PayPal subscriptions recorded yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = subRows.map(s => {
+        const isPrem = (s.plan_tier || 'free').toLowerCase() === 'premium' && (s.subscription_status || '').toLowerCase() === 'active';
+        const isStopped = (s.subscription_status || '').toLowerCase() === 'stopped_by_admin';
+        const badge = isPrem
+          ? '<span class="px-2.5 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Premium Active</span>'
+          : isStopped
+          ? '<span class="px-2.5 py-0.5 rounded-full font-bold bg-rose-50 text-rose-700 border border-rose-200">Stopped by Admin</span>'
+          : `<span class="px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200">Free (${s.subscription_status || 'inactive'})</span>`;
+
+        const actionBtn = isPrem
+          ? `<button onclick="stopSubscription(${s.id}, '${(s.site_url || '').replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] cursor-pointer">Stop Subscription</button>`
+          : '<span class="text-slate-400">--</span>';
+
+        return `
+          <tr class="hover:bg-slate-50/70">
+            <td class="py-3 px-5">
+              <div class="font-bold text-slate-900">${s.company_name || s.site_name || 'WordPress Store'}</div>
+              <div class="text-[11px] text-blue-600 font-mono">${s.site_url}</div>
+            </td>
+            <td class="py-3 px-4">${badge}</td>
+            <td class="py-3 px-4 font-mono text-[11px]">
+              ${s.paypal_subscription_id || '--'}
+              ${s.paypal_plan_id ? `<div class="text-[10px] text-slate-400">Plan: ${s.paypal_plan_id}</div>` : ''}
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">${formatSubDate(s.plan_started_at)}</td>
+            <td class="py-3 px-4 whitespace-nowrap">${formatSubDate(s.plan_expires_at)}</td>
+            <td class="py-3 px-5 text-right whitespace-nowrap">${actionBtn}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function stopSubscription(storeId, siteUrl) {
+      if (!confirm('Stop Premium subscription for ' + siteUrl + '? They will revert to Free tier immediately.')) return;
+      try {
+        const res = await fetch(`${getApiUrl()}/api/v1/internal/admin/stop-subscription`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-staff-token': STAFF_TOKEN },
+          body: JSON.stringify({ store_id: storeId, site_url: siteUrl })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        showToast('Subscription stopped by admin.');
+        fetchStaffData();
+      } catch (err) {
+        showToast('Error stopping subscription: ' + err.message);
       }
     }
 
@@ -387,7 +804,7 @@
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-12 text-slate-400">No matching enterprise stores found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-12 text-slate-400">No matching enterprise stores found.</td></tr>`;
         return;
       }
 
@@ -415,6 +832,9 @@
             </td>
             <td class="py-3.5 px-4 font-medium text-slate-600">
               ${s.industry || 'B2B Enterprise'}
+            </td>
+            <td class="py-3.5 px-4 whitespace-nowrap text-slate-600">
+              ${s.created_at ? formatSubDate(s.created_at) : '--'}
             </td>
             <td class="py-3.5 px-4">
               <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badgeColor}">
