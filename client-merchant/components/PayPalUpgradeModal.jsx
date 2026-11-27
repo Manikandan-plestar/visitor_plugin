@@ -140,8 +140,8 @@ export default function PayPalUpgradeModal({
               <Crown className="w-6 h-6" />
             </span>
             <div>
-              <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
-                Upgrade to Amazer Premium
+              <h3 className="text-lg font-black tracking-tight flex items-center gap-2 !text-white m-0">
+                <span>Upgrade to Amazer Premium</span>
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
                   Full Access
                 </span>
@@ -238,43 +238,98 @@ export default function PayPalUpgradeModal({
               </p>
             </div>
           ) : isConfigured ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {hasAnnual && ppConfig.plan_id && (
-                <div className="flex items-center justify-center gap-2 p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
-                      billingCycle === 'monthly'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Monthly Plan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('annual')}
-                    className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      billingCycle === 'annual'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>Annual Plan</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      billingCycle === 'annual' ? 'bg-amber-400 text-slate-950' : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      Save
-                    </span>
-                  </button>
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-slate-700">Choose Your Billing Cycle</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Monthly Plan Card ($49/mo) */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setBillingCycle('monthly')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setBillingCycle('monthly'); }}
+                      className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer select-none ${
+                        billingCycle === 'monthly'
+                          ? 'border-indigo-600 bg-indigo-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">Monthly Plan</span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            billingCycle === 'monthly' ? 'border-indigo-600' : 'border-slate-300'
+                          }`}
+                        >
+                          {billingCycle === 'monthly' && (
+                            <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                          )}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-1">
+                        <span className="text-2xl font-black text-slate-900">$49</span>
+                        <span className="text-xs font-semibold text-slate-500">/ month</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Billed monthly • Full access
+                      </div>
+                    </div>
+
+                    {/* Annual Plan Card ($468/yr = $39/mo) */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setBillingCycle('annual')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setBillingCycle('annual'); }}
+                      className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer select-none relative ${
+                        billingCycle === 'annual'
+                          ? 'border-indigo-600 bg-indigo-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>Annual Plan</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            Save $120 (20%)
+                          </span>
+                        </span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            billingCycle === 'annual' ? 'border-indigo-600' : 'border-slate-300'
+                          }`}
+                        >
+                          {billingCycle === 'annual' && (
+                            <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                          )}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-1.5">
+                        <span className="text-2xl font-black text-slate-900">$468</span>
+                        <span className="text-xs font-semibold text-slate-500">/ year</span>
+                        <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded-md">
+                          $39/mo
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Billed annually • Best value
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>Pay securely via PayPal Subscription ({billingCycle === 'annual' ? 'Annual' : 'Monthly'})</span>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span>
+                  Selected:{' '}
+                  <strong className="text-slate-800">
+                    {billingCycle === 'annual' ? 'Annual ($468/year)' : 'Monthly ($49/month)'}
+                  </strong>{' '}
+                  via PayPal
+                </span>
                 <span className="font-mono uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                  Mode: {ppConfig.mode}
+                  {ppConfig.mode}
                 </span>
               </div>
               {sdkLoading && (
